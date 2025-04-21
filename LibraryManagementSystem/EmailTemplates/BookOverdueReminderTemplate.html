@@ -1,0 +1,31 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Overdue Book Notice</title>
+</head>
+<body>
+    <h2>Overdue Book Alert</h2>
+
+    <p>Dear <strong>{{UserName}}</strong>,</p>
+
+    <p>This is a reminder that the following book is <strong>overdue</strong> and has not yet been returned. A fine is currently being applied daily until the book is returned.</p>
+
+    <p><strong>Book Details:</strong></p>
+    <ul>
+        <li><strong>Title:</strong> {{BookTitle}}</li>
+        <li><strong>Issued On:</strong> {{IssueDate}}</li>
+        <li><strong>Due Date:</strong> {{DueDate}}</li>
+        <li><strong>Days Overdue:</strong> {{OverdueDays}}</li>
+        <li><strong>Per Day Fine:</strong> ₹{{FinePerDay}}</li>
+        <li><strong>Total Fine Till Now:</strong> ₹{{TotalFine}}</li>
+    </ul>
+
+    <p>Please return the book as soon as possible to stop further fine accumulation.</p>
+
+    <p>
+        Thank you,<br />
+        <em>— Library Management System</em>
+    </p>
+</body>
+</html>

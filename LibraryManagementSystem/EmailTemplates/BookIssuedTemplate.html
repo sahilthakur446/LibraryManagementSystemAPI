@@ -1,0 +1,23 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Book Issued</title>
+</head>
+<body>
+    <h2>Library Book Issued</h2>
+    <p>Hello <strong>{{UserName}}</strong>,</p>
+
+    <p>The following book has been issued to your account:</p>
+
+    <ul>
+        <li><strong>Issue Date:</strong> {{IssueDate}}</li>
+        <li><strong>Return Date:</strong> {{ReturnDate}}</li>
+        <li><strong>Per Day Fine (if overdue):</strong> ₹{{FinePerDay}}</li>
+    </ul>
+
+    <p>Please make sure to return the book on or before the due date to avoid fines.</p>
+
+    <p>Thank you,<br />Library Management System</p>
+</body>
+</html>

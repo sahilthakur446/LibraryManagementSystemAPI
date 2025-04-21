@@ -1,0 +1,30 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Book Returned Successfully</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <h2 style="color: #2E86C1;">📚 Book Returned</h2>
+
+    <p>Hello <strong>{{UserName}}</strong>,</p>
+
+    <p>We have successfully received the book you had borrowed. Below are the details of your transaction:</p>
+
+    <ul>
+        <li><strong>Issue Date:</strong> {{IssueDate}}</li>
+        <li><strong>Due Date:</strong> {{DueDate}}</li>
+        <li><strong>Return Date:</strong> {{ReturnDate}}</li>
+        <li><strong>Per Day Fine (if overdue):</strong> ₹{{FinePerDay}}</li>
+        <li><strong>Total Fine Applied:</strong> ₹{{FineAmount}}</li>
+    </ul>
+
+    <p>
+        If there was any fine, kindly ensure it is cleared at the earliest to avoid further inconvenience.
+    </p>
+
+    <p>Thank you for using our library services. We look forward to serving you again soon!</p>
+
+    <p>Warm regards,<br />Library Management System</p>
+</body>
+</html>

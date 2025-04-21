@@ -1,0 +1,28 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Reminder: Book Return Due Tomorrow</title>
+</head>
+<body>
+    <h2>Friendly Reminder: Book Return Due Tomorrow</h2>
+
+    <p>Dear <strong>{{UserName}}</strong>,</p>
+
+    <p>We hope you're enjoying your book! This is a kind reminder that the due date for returning your borrowed book is <strong>tomorrow</strong>.</p>
+
+    <p><strong>Book Details:</strong></p>
+    <ul>
+        <li><strong>Title:</strong> {{BookTitle}}</li>
+        <li><strong>Issued On:</strong> {{IssueDate}}</li>
+        <li><strong>Due Date:</strong> {{DueDate}}</li>
+        <li><strong>Fine (if returned late):</strong> ₹{{FinePerDay}} per day</li>
+    </ul>
+
+    <p>To avoid late fees, please ensure the book is returned on or before the due date.</p>
+    <p>
+        Thank you for being a responsible reader!<br />
+        <em>— Library Management System</em>
+    </p>
+</body>
+</html>
