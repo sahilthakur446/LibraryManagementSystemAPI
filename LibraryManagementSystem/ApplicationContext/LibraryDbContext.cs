@@ -18,6 +18,7 @@ public partial class LibraryDbContext : DbContext
     public virtual DbSet<Author> Authors { get; set; }
 
     public virtual DbSet<Book> Books { get; set; }
+    public virtual DbSet<BookCopy> BookCopies { get; set; }
 
     public virtual DbSet<Category> Categories { get; set; }
 
@@ -123,9 +124,9 @@ public partial class LibraryDbContext : DbContext
                 .HasConstraintName("FK__Users__RoleId__5812160E");
         });
 
-        modelBuilder.Entity<BorrowedBook>(entity =>
+         modelBuilder.Entity<BorrowedBook>(entity =>
         {
-            entity.HasKey(e => e.BorrowId).HasName("PK__Borrowed__4295F83F042C3ACD");
+            entity.HasKey(e => e.BorrowId).HasName("PK__Borrowed__4295F83F6F7C3F4D");
 
             entity.Property(e => e.BorrowDate)
                 .HasDefaultValueSql("(getutcdate())")
@@ -134,10 +135,15 @@ public partial class LibraryDbContext : DbContext
             entity.Property(e => e.FineAmount).HasDefaultValue(0);
             entity.Property(e => e.ReturnDate).HasColumnType("datetime");
 
-            entity.HasOne(d => d.Status).WithMany(p => p.BorrowedBooks)
-                .HasForeignKey(d => d.StatusId)
+            entity.HasOne(d => d.BookCopy).WithMany(p => p.BorrowedBooks)
+                .HasForeignKey(d => d.BookCopyId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK__BorrowedB__Statu__208CD6FA");
+                .HasConstraintName("FK_BorrowedBooks_BookCopies_CopyId");
+
+            entity.HasOne(d => d.User).WithMany(p => p.BorrowedBooks)
+                .HasForeignKey(d => d.UserId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK__BorrowedB__UserI__2645B050");
         });
 
         modelBuilder.Entity<BorrowedBookStatus>(entity =>

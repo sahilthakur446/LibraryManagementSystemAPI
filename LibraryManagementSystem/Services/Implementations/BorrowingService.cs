@@ -69,11 +69,11 @@ namespace LibraryManagementSystem.Services.Implementations
             }
         }
 
-        public async Task<BorrowingResponseDTO> ReturnBookAsync(int bookId, int userId)
+        public async Task<BorrowingResponseDTO> ReturnBookAsync(int copyBookId, int userId)
         {
             try
             {
-                var returnedBook = await borrowingRepository.ReturnBookAsync(bookId, userId);
+                var returnedBook = await borrowingRepository.ReturnBookAsync(copyBookId, userId);
                 string userName = $"{returnedBook.User.FirstName} {returnedBook.User.LastName}";
                 await emailService.SendBookReturnedEmailAsync(
                     returnedBook.User.Email,
@@ -84,7 +84,7 @@ namespace LibraryManagementSystem.Services.Implementations
             }
             catch (RepositoryException ex)
             {
-                logger.LogError(ex, "Error while returning book for UserId: {UserId}, BookId: {BookId}", userId, bookId);
+                logger.LogError(ex, "Error while returning book for UserId: {UserId},CopyBookId;{CopyBookId}", userId, copyBookId);
                 throw new BusinessExceptions("An error occurred while processing your return request. Please try again later.", StatusCodes.Status500InternalServerError);
             }
         }
@@ -102,7 +102,7 @@ namespace LibraryManagementSystem.Services.Implementations
                 }
 
                 var userId = returnedBook.User.UserId;
-                var bookId = returnedBook.Book?.BookId ?? 0;
+                var bookCopyId = returnedBook.BookCopy?.CopyId ?? 0;
                 string userName = $"{returnedBook.User.FirstName} {returnedBook.User.LastName}";
 
                 await emailService.SendBookReturnedEmailAsync(
@@ -113,7 +113,7 @@ namespace LibraryManagementSystem.Services.Implementations
                     DateTime.UtcNow.Date
                 );
 
-                logger.LogInformation("ReturnBookAsync: Book ID {BookId} successfully returned by User ID {UserId}", bookId, userId);
+                logger.LogInformation("ReturnBookAsync: Book Copy ID {BookId} successfully returned by User ID {UserId}", bookCopyId, userId);
 
                 return BorrowingMapper.FromModel(returnedBook);
             }

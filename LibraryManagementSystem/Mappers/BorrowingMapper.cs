@@ -12,13 +12,13 @@ namespace LibraryManagementSystem.Mappers
                 BorrowId = book.BorrowId,
                 UserId = book.UserId,
                 UserName = $"{book.User?.FirstName} {book.User?.LastName}" ?? "N/A",
-                BookId = book.BookId,
-                BookName = book.Book?.Title ?? "N/A",
+                BookId = book.BookCopy.BookId,
+                BookName = book.BookCopy.Book?.Title ?? "N/A",
                 BorrowDate = book.BorrowDate?.ToString("yyyy-MM-dd") ?? "N/A",
                 DueDate = book.DueDate.ToString("yyyy-MM-dd"),
                 ReturnDate = book.ReturnDate?.ToString("yyyy-MM-dd") ?? "Not Returned",
                 FineAmount = book.FineAmount,
-                BorrowStatus = book.Status?.StatusName ?? "Unknown"
+                BorrowStatus = book.BorrowedBookStatus?.StatusName ?? "Unknown"
             };
         }
 
