@@ -91,8 +91,8 @@ public class BookService : IBookService
         }
         catch (RepositoryException ex)
         {
-            logger.LogError(ex, "Error fetching books");
-            throw new BusinessExceptions("Error fetching books", StatusCodes.Status500InternalServerError);
+            logger.LogError(ex, "Service: Error fetching books");
+            throw new BusinessExceptions("Service: Error fetching books Ex", StatusCodes.Status500InternalServerError);
         }
     }
 

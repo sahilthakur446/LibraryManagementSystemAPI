@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace LibraryManagementSystem.Models;
+namespace LibraryManagementSystem.Modelssss;
 
 public partial class BorrowedBook
 {
@@ -22,4 +22,6 @@ public partial class BorrowedBook
     public int StatusId { get; set; }
 
     public virtual BookCopy BookCopy { get; set; } = null!;
+
+    public virtual User User { get; set; } = null!;
 }

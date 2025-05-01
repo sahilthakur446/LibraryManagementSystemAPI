@@ -74,6 +74,14 @@ public partial class LibraryDbContext : DbContext
                 .HasColumnType("datetime");
         });
 
+        //modelBuilder.Entity<BookCopy>(entity =>
+        //{
+        //    entity.HasKey(e => e.CopyId).HasName("PK__BookCopi__C26CCCC5E5090D7E");
+
+        //    entity.Property(e => e.IsAvailable).HasDefaultValue(true);
+        //});
+
+        OnModelCreatingPartial(modelBuilder);
         modelBuilder.Entity<Category>(entity =>
         {
             entity.HasKey(e => e.CategoryId).HasName("PK__Categori__19093A0B995E988A");

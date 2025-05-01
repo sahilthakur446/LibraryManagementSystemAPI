@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace LibraryManagementSystem.Models;
+namespace LibraryManagementSystem.Modelss;
 
 public partial class BookCopy
 {
@@ -10,8 +10,4 @@ public partial class BookCopy
     public int BookId { get; set; }
 
     public bool IsAvailable { get; set; }
-
-    public virtual Book Book { get; set; } = null!;
-
-    public virtual ICollection<BorrowedBook> BorrowedBooks { get; set; } = new List<BorrowedBook>();
 }

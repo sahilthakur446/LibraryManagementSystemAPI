@@ -296,8 +296,6 @@ namespace LibraryManagementSystem.Repositories.EF
                 throw new RepositoryException("An unexpected error occurred while returning the book.", ex);
             }
         }
-
-
         public async Task<IList<BorrowedBook>> GetBorrowedBooksByUserIdAsync(int userId)
         {
             try

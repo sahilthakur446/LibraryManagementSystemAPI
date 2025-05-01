@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 
 namespace LibraryManagementSystem.Models;
 
@@ -26,9 +25,7 @@ public partial class Book
 
     public DateTime? UpdatedAt { get; set; }
 
-    public virtual Author Author { get; set; } = null!;
-
-    public virtual Category Category { get; set; } = null!;
-    [Timestamp]
     public byte[] RowVersion { get; set; } = null!;
+
+    public virtual ICollection<BookCopy> BookCopies { get; set; } = new List<BookCopy>();
 }

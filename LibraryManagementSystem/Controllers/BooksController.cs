@@ -33,6 +33,7 @@ namespace LibraryManagementSystem.Controllers
             }
             catch (BusinessExceptions ex)
             {
+                logger.LogError(ex, "Controller: An error occurred while fetching all books");
                 return StatusCode(ex.StatusCode, ApiResponse<string>.Fail(ex.Message));
             }
             catch (Exception ex)
