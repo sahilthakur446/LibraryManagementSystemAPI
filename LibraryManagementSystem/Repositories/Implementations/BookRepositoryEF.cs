@@ -20,7 +20,7 @@ namespace LibraryManagementSystem.Repositories.EF
         {
             try
             {
-                var books = await dbContext.Books.AsNoTracking().Include(b => b.Author).Include(b => b.Category).ToListAsync();
+                var books = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).Include(b => b.Category).ToListAsync();
                 if (books == null || !books.Any())
                 {
                     _logger.LogInformation("No books found in the database.");

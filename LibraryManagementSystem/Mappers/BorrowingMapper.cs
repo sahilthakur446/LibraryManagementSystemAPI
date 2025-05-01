@@ -27,7 +27,8 @@ namespace LibraryManagementSystem.Mappers
             return new BorrowedBook
             {
                 UserId = book.UserId,
-                BookId = book.BookId
+                BookId = book.BookId,
+                BookCopyId = book.BookCopyId,
             };
         }
     }

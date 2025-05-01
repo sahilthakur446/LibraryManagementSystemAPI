@@ -26,6 +26,7 @@ public partial class Book
     public DateTime? UpdatedAt { get; set; }
 
     public byte[] RowVersion { get; set; } = null!;
-
+    public virtual Author Author { get; set; }
+    public virtual Category Category { get; set; }
     public virtual ICollection<BookCopy> BookCopies { get; set; } = new List<BookCopy>();
 }

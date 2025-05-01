@@ -100,7 +100,7 @@ public class BookService : IBookService
     {
         try
         {
-            var book = await bookRepository.GetById(id);
+            Book? book = await bookRepository.GetById(id);
             if (book == null)
             {
                 logger.LogWarning("Book with ID {Id} not found", id);
