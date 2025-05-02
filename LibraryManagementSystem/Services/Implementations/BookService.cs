@@ -1,5 +1,6 @@
 ﻿using LibraryManagementSystem.DTOs.Book;
 using LibraryManagementSystem.Exceptions;
+using LibraryManagementSystem.Mappers;
 using LibraryManagementSystem.Models;
 using LibraryManagementSystem.Repositories.Interfaces;
 using LibraryManagementSystem.Services.Interfaces;
@@ -31,16 +32,7 @@ public class BookService : IBookService
                 throw new BusinessExceptions("Invalid book details provided", StatusCodes.Status400BadRequest);
             }
 
-            var book = new Book
-            {
-                Title = BookDTO.Title,
-                AuthorId = BookDTO.AuthorId,
-                Isbn = BookDTO.ISBN,
-                CategoryId = BookDTO.CategoryId,
-                PublishedYear = BookDTO.PublishedYear,
-                TotalCopies = BookDTO.TotalCopies,
-                AvailableCopies = BookDTO.AvailableCopies
-            };
+            var book = BookMapper.ToModel(BookDTO);
 
             return await bookRepository.Insert(book);
         }
@@ -49,7 +41,7 @@ public class BookService : IBookService
             logger.LogError(ex, "Error occurred while adding book");
             throw new BusinessExceptions("Error occurred while adding book", StatusCodes.Status500InternalServerError);
         }
-        
+
     }
 
     public async Task<bool> DeleteBook(int id)
@@ -75,19 +67,8 @@ public class BookService : IBookService
                 logger.LogInformation("No books found");
                 throw new BusinessExceptions("No books found", StatusCodes.Status404NotFound);
             }
-                var allBooks = books.Select(book => new BookDTO
-            {
-                BookId = book.BookId,
-                Title = book.Title,
-                ISBN = book.Isbn,
-                Author = book.Author.AuthorName,
-                Category = book.Category.CategoryName,
-                PublishedYear = book.PublishedYear,
-                AvailableCopies = book.AvailableCopies,
-                TotalCopies = book.TotalCopies
-            });
+            var allBooks = books.Select(b => BookMapper.FromModel(b!));
             return allBooks.ToList();
-
         }
         catch (RepositoryException ex)
         {
@@ -107,17 +88,7 @@ public class BookService : IBookService
                 throw new BusinessExceptions("Book not found", StatusCodes.Status404NotFound);
             }
 
-            return new BookDTO
-            {
-                BookId = book.BookId,
-                Title = book.Title,
-                ISBN = book.Isbn,
-                Author = book.Author.AuthorName,
-                Category = book.Category.CategoryName,
-                PublishedYear = book.PublishedYear,
-                AvailableCopies = book.AvailableCopies,
-                TotalCopies = book.TotalCopies
-            };
+            return BookMapper.FromModel(book);
         }
         catch (RepositoryException ex)
         {

@@ -15,6 +15,6 @@ namespace LibraryManagementSystem.DTOs.Book
         public int AvailableCopies { get; set; }
         public string Author { get; set; }
         public string Category { get; set; }
-
+        public List<BookCopyResponseDTO> BookCopies { get; set;} = new List<BookCopyResponseDTO>();
     }
 }
