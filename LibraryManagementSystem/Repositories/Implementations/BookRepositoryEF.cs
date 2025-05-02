@@ -20,7 +20,7 @@ namespace LibraryManagementSystem.Repositories.EF
         {
             try
             {
-                var books = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).Include(b => b.Category).ToListAsync();
+                var books = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).Include(b => b.Author).Include(b => b.Category).ToListAsync();
                 if (books == null || !books.Any())
                 {
                     _logger.LogInformation("No books found in the database.");
@@ -90,7 +90,6 @@ namespace LibraryManagementSystem.Repositories.EF
                 throw new RepositoryException("Error inserting book.", ex);
             }
         }
-
 
         public async Task<bool> Update(Book book)
         {
@@ -177,7 +176,7 @@ namespace LibraryManagementSystem.Repositories.EF
         {
             try
             {
-                var bookWithCopies = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).ToListAsync();
+                var bookWithCopies = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).Include(b => b.Author).Include(b => b.Category).ToListAsync();
                 if (bookWithCopies == null || !bookWithCopies.Any())
                 {
                     _logger.LogInformation("No books found with copies.");
