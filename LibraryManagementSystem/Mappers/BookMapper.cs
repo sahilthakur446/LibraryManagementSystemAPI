@@ -9,7 +9,7 @@ namespace LibraryManagementSystem.Mappers
         public static BookDTO FromModel(Book book) 
         {
             var bookCopies = new List<BookCopyResponseDTO>();
-            if (book.BookCopies.Any())
+            if (book.BookCopies != null && book.BookCopies.Any())
             {
                 bookCopies = book.BookCopies.Select(BookCopyMapper.FromModel).ToList();
             }
@@ -18,8 +18,10 @@ namespace LibraryManagementSystem.Mappers
                 BookId = book.BookId,
                 Title = book.Title,
                 ISBN = book.Isbn,
-                Author = book.Author.AuthorName,
-                Category = book.Category.CategoryName,
+                AuthorId =book.AuthorId,  
+                AuthorName = book.Author?.AuthorName ?? "Unknown",
+                CategoryId = book.CategoryId,
+                CategoryName = book.Category?.CategoryName ?? "Unknown",
                 PublishedYear = book.PublishedYear,
                 AvailableCopies = book.AvailableCopies,
                 TotalCopies = book.TotalCopies,

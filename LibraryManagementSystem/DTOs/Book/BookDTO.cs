@@ -13,8 +13,10 @@ namespace LibraryManagementSystem.DTOs.Book
         public int PublishedYear { get; set; }
         public int TotalCopies { get; set; }
         public int AvailableCopies { get; set; }
-        public string Author { get; set; }
-        public string Category { get; set; }
+        public int AuthorId { get; set; }
+        public string AuthorName { get; set; }
+        public int CategoryId { get; set; }
+        public string CategoryName { get; set; }
         public List<BookCopyResponseDTO> BookCopies { get; set;} = new List<BookCopyResponseDTO>();
     }
 }

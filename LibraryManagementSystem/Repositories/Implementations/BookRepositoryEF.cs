@@ -1,4 +1,6 @@
-﻿using LibraryManagementSystem.Exceptions;
+﻿using LibraryManagementSystem.DTOs.Book;
+using LibraryManagementSystem.Exceptions;
+using LibraryManagementSystem.Mappers;
 using LibraryManagementSystem.Models;
 using LibraryManagementSystem.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +22,7 @@ namespace LibraryManagementSystem.Repositories.EF
         {
             try
             {
-                var books = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).Include(b => b.Author).Include(b => b.Category).ToListAsync();
+                var books = await dbContext.Books.AsNoTracking().Include(b => b.Author).Include(b => b.Category).ToListAsync();
                 if (books == null || !books.Any())
                 {
                     _logger.LogInformation("No books found in the database.");
@@ -39,7 +41,7 @@ namespace LibraryManagementSystem.Repositories.EF
         {
             try
             {
-                var book = await dbContext.Books.FindAsync(id);
+                var book = await dbContext.Books.Include(b => b.Author).Include(b => b.Category).FirstOrDefaultAsync(b => b.BookId == id);
                 if (book is null)
                 {
                     _logger.LogWarning("Book not found with ID: {Id}", id);
@@ -80,7 +82,7 @@ namespace LibraryManagementSystem.Repositories.EF
                     _logger.LogWarning("Insert operation failed for book: {@Book}", book);
                     return false;
                 }
-
+                await transaction.CommitAsync();
                 return true;
             }
             catch (Exception ex)
@@ -158,8 +160,16 @@ namespace LibraryManagementSystem.Repositories.EF
                     await dbContext.BookCopies.AddRangeAsync(bookCopyList);
                     await dbContext.SaveChangesAsync();
 
-                    addedBooks.Add(book);
+                    // Re-fetch the book with Author and Category populated
+                    var completeBook = await dbContext.Books
+                        .Include(b => b.Author)
+                        .Include(b => b.Category)
+                        .Include(b => b.BookCopies)
+                        .FirstOrDefaultAsync(b => b.BookId == book.BookId);
+
+                    addedBooks.Add(completeBook);
                 }
+
 
                 await transaction.CommitAsync();
                 return addedBooks;
@@ -176,39 +186,139 @@ namespace LibraryManagementSystem.Repositories.EF
         {
             try
             {
-                var bookWithCopies = await dbContext.Books.AsNoTracking().Include(b => b.BookCopies).Include(b => b.Author).Include(b => b.Category).ToListAsync();
-                if (bookWithCopies == null || !bookWithCopies.Any())
+                var booksWithCopies = await dbContext.Books
+                    .AsNoTracking()
+                    .Include(b => b.BookCopies)
+                    .Include(b => b.Author)
+                    .Include(b => b.Category)
+                    .ToListAsync();
+
+                if (booksWithCopies is null || booksWithCopies.Count == 0)
                 {
-                    _logger.LogInformation("No books found with copies.");
-                    return bookWithCopies;
+                    _logger.LogInformation("No books with copies were found in the database.");
                 }
-                return bookWithCopies;
+
+                return booksWithCopies;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,"Error Occurred in GetAllBooksWithCopies method of BookRepository");
-                throw new RepositoryException("Database error occured", ex);
+                _logger.LogError(ex, "An error occurred while retrieving all books with copies.");
+                throw new RepositoryException("An error occurred while retrieving books from the database.", ex);
             }
         }
 
-        public Task<List<Book>> GetBookAllCopies()
+        public async Task<Book> GetBookWithCopies(int id)
         {
-            throw new NotImplementedException();
+            try
+            {
+                var book = await dbContext.Books
+                    .Include(b => b.BookCopies)
+                    .Include(b => b.Author)
+                    .Include(b => b.Category)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(b => b.BookId == id);
+
+                if (book is null)
+                {
+                    _logger.LogWarning("Book with ID {Id} was not found.", id);
+                    return null;
+                }
+
+                return book;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching the book with ID {Id}.", id);
+                throw new RepositoryException("An error occurred while fetching the book.", ex);
+            }
+        }
+        public async Task<BookCopy?> GetBookCopyById(int id, bool getRelatedBook = true)
+        {
+            try
+            {
+                BookCopy? bookCopy;
+
+                if (getRelatedBook)
+                {
+                    bookCopy = await dbContext.BookCopies
+                        .Where(bc => bc.CopyId == id)
+                        .Include(b => b.Book)
+                        .FirstOrDefaultAsync();
+                }
+                else
+                {
+                    bookCopy = await dbContext.BookCopies.FindAsync(id);
+                }
+
+                if (bookCopy is null)
+                {
+                    _logger.LogWarning("Book copy not found with ID: {Id}", id);
+                    return null;
+                }
+
+                return bookCopy;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching book copy by ID: {Id}", id);
+                throw new RepositoryException("Error fetching book copy.", ex);
+            }
         }
 
-        public Task<bool> AddBookCopy(Book book)
+        public async Task<bool> AddBookCopy(BookCopy bookCopy, Book book)
         {
-            throw new NotImplementedException();
+            try
+            {
+                await dbContext.BookCopies.AddAsync(bookCopy);
+                dbContext.Attach(book);
+                dbContext.Entry(book).Property(b => b.TotalCopies).IsModified = true;
+                dbContext.Entry(book).Property(b => b.AvailableCopies).IsModified = true;
+                var result = await dbContext.SaveChangesAsync();
+                return result > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while adding a new BookCopy.");
+                throw new RepositoryException("An error occurred while saving the Book Copy.", ex);
+            }
         }
 
-        public Task<bool> UpdateBookCopy(Book book)
+        public async Task<bool> UpdateBookCopy(BookCopy bookCopy, Book book)
         {
-            throw new NotImplementedException();
+            try
+            {
+                dbContext.Attach(book);
+                dbContext.Entry(book).Property(b => b.TotalCopies).IsModified = true;
+                dbContext.Entry(book).Property(b => b.AvailableCopies).IsModified = true;
+
+                dbContext.BookCopies.Update(bookCopy);
+
+                var result = await dbContext.SaveChangesAsync();
+                return result > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while updating BookCopy with ID: {Id}.", bookCopy.CopyId);
+                throw new RepositoryException("An error occurred while updating the Book Copy.", ex);
+            }
         }
 
-        public Task<bool> DeleteBookCopy(Book book)
+        public async Task<bool> DeleteBookCopy(BookCopy bookCopy,Book book)
         {
-            throw new NotImplementedException();
+            try
+            {
+                dbContext.BookCopies.Remove(bookCopy);
+                dbContext.Attach(book);
+                dbContext.Entry(book).Property(b => b.TotalCopies).IsModified = true;
+                dbContext.Entry(book).Property(b => b.AvailableCopies).IsModified = true;
+                var result = await dbContext.SaveChangesAsync();
+                return result > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while deleting BookCopy with ID: {Id}.", bookCopy.CopyId);
+                throw new RepositoryException("An error occurred while deleting the Book Copy.", ex);
+            }
         }
     }
 }

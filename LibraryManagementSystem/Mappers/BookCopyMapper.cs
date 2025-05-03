@@ -7,12 +7,14 @@ namespace LibraryManagementSystem.Mappers
     public class BookCopyMapper
     {
         public static BookCopyResponseDTO FromModel(BookCopy bookCopy)
+        
         {
             var bookCopyDto = new BookCopyResponseDTO
             {
                 CopyId = bookCopy.CopyId,
                 BookId = bookCopy.BookId,
                 IsAvailable = bookCopy.IsAvailable,
+                Book = bookCopy.Book != null ? BookMapper.FromModel(bookCopy.Book) : null
             };
             return bookCopyDto;
         }

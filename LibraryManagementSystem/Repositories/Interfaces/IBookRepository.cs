@@ -7,9 +7,10 @@ namespace LibraryManagementSystem.Repositories.Interfaces
         Task<List<Book>> AddBooks(List<Book> books);
 
         Task<List<Book>> GetAllBooksWithCopies();
-        Task<List<Book>> GetBookAllCopies();
-        Task<bool> AddBookCopy(Book book);
-        Task<bool> UpdateBookCopy(Book book);
-        Task<bool> DeleteBookCopy(Book book);
+        Task<Book?> GetBookWithCopies(int id);
+        Task<BookCopy?> GetBookCopyById(int id, bool getRelatedBook = true);
+        Task<bool> AddBookCopy(BookCopy bookCopy, Book book);
+        Task<bool> UpdateBookCopy(BookCopy bookCopy, Book book);
+        Task<bool> DeleteBookCopy(BookCopy bookCopy, Book book);
     }
 }
