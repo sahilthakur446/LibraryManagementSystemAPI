@@ -188,7 +188,6 @@ public class BookService : IBookService
             throw new BusinessExceptions("Error fetching book with copies", StatusCodes.Status500InternalServerError);
         }
     }
-
     public async Task<BookCopyResponseDTO> GetBookCopyById(int bookCopyId)
     {
         try
@@ -209,7 +208,6 @@ public class BookService : IBookService
             throw new BusinessExceptions("An error occurred while retrieving the book copy.", StatusCodes.Status500InternalServerError);
         }
     }
-
 
     public async Task<bool> AddBookCopy(BookCopyRequestDTO bookCopyDTO)
     {
@@ -253,47 +251,26 @@ public class BookService : IBookService
             if (bookCopy == null)
                 throw new BusinessExceptions("Book copy not found", StatusCodes.Status404NotFound);
 
-            // If BookId has changed, adjust the Total and Available copies
-            if (bookCopy.BookId != bookCopyDto.BookId)
+            var book = await bookRepository.GetById(bookCopy.BookId);
+            if (book == null)
+                throw new BusinessExceptions("Associated book not found", StatusCodes.Status404NotFound);
+
+            // Adjust availability count if availability status has changed
+            if (!bookCopyDto.IsAvailable && bookCopy.IsAvailable)
             {
-                var oldBook = await bookRepository.GetById(bookCopy.BookId);
-                if (oldBook == null)
-                    throw new BusinessExceptions("Old book not found", StatusCodes.Status404NotFound);
-
-                oldBook.TotalCopies -= 1;
-                if (bookCopy.IsAvailable)
-                {
-                    oldBook.AvailableCopies = oldBook.AvailableCopies - 1;
-                }
-
-                await bookRepository.Update(oldBook);
-
-                var newBook = await bookRepository.GetById(bookCopyDto.BookId);
-                if (newBook == null)
-                    throw new BusinessExceptions("New book not found", StatusCodes.Status404NotFound);
-
-                newBook.TotalCopies += 1;
-                if (bookCopyDto.IsAvailable)
-                {
-                    newBook.AvailableCopies = newBook.AvailableCopies + 1;
-                }
-
-                bookCopy.Book = newBook;
+                book.AvailableCopies -= 1;
             }
-            else
+            else if (bookCopyDto.IsAvailable && !bookCopy.IsAvailable)
             {
-                // BookId hasn't changed but availability has
-                if (!bookCopyDto.IsAvailable && bookCopy.IsAvailable)
-                    bookCopy.Book.AvailableCopies -= 1;
-                else if (bookCopyDto.IsAvailable && !bookCopy.IsAvailable)
-                    bookCopy.Book.AvailableCopies += 1;
+                book.AvailableCopies += 1;
             }
 
-            // Update the bookCopy values
-            bookCopy.BookId = bookCopyDto.BookId;
+            // Update the book copy's availability status
             bookCopy.IsAvailable = bookCopyDto.IsAvailable;
 
-            return await bookRepository.UpdateBookCopy(bookCopy, bookCopy.Book);
+            // Persist changes
+            await bookRepository.Update(book);
+            return await bookRepository.UpdateBookCopy(bookCopy, book);
         }
         catch (RepositoryException ex)
         {

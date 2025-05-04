@@ -152,6 +152,10 @@ public partial class LibraryDbContext : DbContext
                 .HasForeignKey(d => d.UserId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__BorrowedB__UserI__2645B050");
+            entity.HasOne(d => d.BorrowedBookStatus).WithMany(p => p.BorrowedBooks)
+                 .HasForeignKey(d => d.StatusId)
+                 .OnDelete(DeleteBehavior.ClientNoAction)
+                 .HasConstraintName("FK__BorrowedB__Statu__282DF8C2");
         });
 
         modelBuilder.Entity<BorrowedBookStatus>(entity =>

@@ -9,6 +9,7 @@ namespace LibraryManagementSystem.DTOs.Book
         public int BookId { get; set; }
 
         public bool IsAvailable { get; set; }
+        public string BookName { get; set; }
         public BookDTO? Book { get; set; } = null;
     }
 }

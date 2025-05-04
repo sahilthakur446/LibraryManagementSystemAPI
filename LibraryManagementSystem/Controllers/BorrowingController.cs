@@ -1,6 +1,7 @@
 ﻿using LibraryManagementSystem.ApiResponse;
 using LibraryManagementSystem.DTOs.Borrowing;
 using LibraryManagementSystem.Exceptions;
+using LibraryManagementSystem.Services.Implementations;
 using LibraryManagementSystem.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,7 +25,7 @@ namespace LibraryManagementSystem.Controllers
         [ProducesResponseType(typeof(ApiResponse<BorrowingResponseDTO>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<BorrowingResponseDTO>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<BorrowingResponseDTO>), StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<ApiResponse<BorrowingResponseDTO>>> BorrowBook(int bookId, int userId)
+        public async Task<ActionResult<ApiResponse<BorrowingResponseDTO>>> BorrowBook(int bookId, int userId, int bookCopyId = 0)
         {
             try
             {
@@ -178,6 +179,23 @@ namespace LibraryManagementSystem.Controllers
             {
                 logger.LogError(ex, "Unexpected error in GetRemainingFineByUserId");
                 return StatusCode(500, ApiResponse<int>.Fail("An unexpected error occurred"));
+            }
+        }
+
+        [HttpGet("due-tomorrow-email")]
+        [ProducesResponseType(typeof(IList<BorrowedBookEmailDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetBorrowedBooksDueTomorrowForEmail()
+        {
+            try
+            {
+                var borrowings = await borrowingService.GetBorrowedBooksDueTomorrowForEmailAsync();
+                return Ok(borrowings);
+            }
+            catch (BusinessExceptions ex)
+            {
+                logger.LogError(ex, "Failed to get borrowings due tomorrow.");
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
     }

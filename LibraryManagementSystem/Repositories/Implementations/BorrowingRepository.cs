@@ -37,13 +37,17 @@ namespace LibraryManagementSystem.Repositories.EF
             }
         }
 
-        public async Task<BorrowedBook> BorrowBookAsync(int bookCopyId, int userId)
+        public async Task<BorrowedBook> BorrowBookAsync(int bookId, int userId, int bookCopyId = 0)
         {
             await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
             try
             {
                 // Fetch book copy and book
+                if (bookCopyId == 0)
+                {
+                    bookCopyId = await AutoSelectBookCopy(bookId);
+                }
                 var bookCopy = await dbContext.BookCopies
                     .Include(bc => bc.Book)
                     .FirstOrDefaultAsync(bc => bc.CopyId == bookCopyId);
@@ -224,7 +228,7 @@ namespace LibraryManagementSystem.Repositories.EF
 
             try
             {
-                // Fetch the borrowed book with full related data
+                // 1. Fetch borrowed book with full related data
                 var borrowedBook = await dbContext.BorrowedBooks
                     .Include(bb => bb.BookCopy)
                         .ThenInclude(bc => bc.Book)
@@ -234,48 +238,54 @@ namespace LibraryManagementSystem.Repositories.EF
                 if (borrowedBook == null)
                 {
                     logger.LogWarning("Borrowed record not found for BorrowingId {BorrowingId}", borrowingId);
-                    throw new RepositoryException("Borrowed record not found.");
+                    return null;
                 }
 
+                // 2. Check if already returned
                 if (borrowedBook.StatusId == (int)BorrowedBookStatusEnum.Returned)
                 {
                     logger.LogWarning("Book with BorrowingId {BorrowingId} has already been returned", borrowingId);
                     throw new RepositoryException("This book has already been returned.");
                 }
 
+                // 3. Get related book entity
                 var book = borrowedBook.BookCopy?.Book;
-
                 if (book == null)
                 {
                     logger.LogError("Book data is missing for BorrowingId {BorrowingId}", borrowingId);
                     throw new RepositoryException("Book data not found for borrowed record.");
                 }
 
-                // Extract IDs for logging
                 var bookId = book.BookId;
                 var userId = borrowedBook.User?.UserId ?? 0;
 
-                // Update book stock
-                book.AvailableCopies += 1;
+                // 4. Update availability and stock
+                book.AvailableCopies++;
+                borrowedBook.BookCopy!.IsAvailable = true;
 
-                // Update borrow record
+                // 5. Update borrowing record
                 borrowedBook.StatusId = (int)BorrowedBookStatusEnum.Returned;
                 borrowedBook.ReturnDate = DateTime.UtcNow.Date;
 
-                if (borrowedBook.ReturnDate > borrowedBook.DueDate)
-                {
-                    borrowedBook.FineAmount = (borrowedBook.ReturnDate.Value - borrowedBook.DueDate).Days * 5;
-                }
-                else
-                {
-                    borrowedBook.FineAmount = 0;
-                }
+                // 6. Calculate fine if returned late
+                borrowedBook.FineAmount = borrowedBook.ReturnDate > borrowedBook.DueDate
+                    ? (borrowedBook.ReturnDate.Value - borrowedBook.DueDate).Days * 5
+                    : 0;
 
+                // 7. Save and commit
                 await dbContext.SaveChangesAsync();
                 await transaction.CommitAsync();
 
                 logger.LogInformation("Book with ID {BookId} returned by User ID {UserId}", bookId, userId);
-                return borrowedBook;
+
+                // 8. Fetch and return updated record with full details
+                return await dbContext.BorrowedBooks
+                    .Include(bb => bb.BookCopy)
+                        .ThenInclude(bc => bc.Book)
+                    .Include(bb => bb.User)
+                    .Include(bb => bb.BorrowedBookStatus)
+                    .FirstOrDefaultAsync(bb => bb.BorrowId == borrowedBook.BorrowId)
+                    ?? throw new RepositoryException("Failed to fetch updated return record.");
             }
             catch (DbUpdateConcurrencyException ex)
             {
@@ -301,7 +311,9 @@ namespace LibraryManagementSystem.Repositories.EF
             try
             {
                 return await dbContext.BorrowedBooks
-                    .Where(bb => bb.UserId == userId && bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed || bb.StatusId == (int)BorrowedBookStatusEnum.Overdue)
+                    .Where(bb => bb.UserId == userId &&
+                     (bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed ||
+                     bb.StatusId == (int)BorrowedBookStatusEnum.Overdue))
                     .Include(bb => bb.User)
                     .Include(bb => bb.BookCopy)
                     .ThenInclude(bc => bc.Book)
@@ -365,9 +377,69 @@ namespace LibraryManagementSystem.Repositories.EF
             }
         }
 
-        public Task<bool> HasUserAlreadyBorrowedSameBookAsync(int bookId, int userId)
+        private async Task<int> AutoSelectBookCopy(int bookId)
         {
-            throw new NotImplementedException();
+            try
+            {
+                var bookCopy = await dbContext.BookCopies
+                    .Where(bc => bc.BookId == bookId && bc.IsAvailable)
+                    .FirstOrDefaultAsync();
+
+                if (bookCopy == null)
+                {
+                    throw new RepositoryException($"No available copy found for BookId: {bookId}");
+                }
+                return bookCopy.CopyId;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"Error in AutoSelectBookCopy for BookId: {bookId}");
+                throw new RepositoryException("Error selecting available book copy.", ex);
+            }
         }
+        public async Task<IList<BorrowedBook>> GetAllBorrowedBooksDueTomorrowAsync()
+        {
+            try
+            {
+                return await dbContext.BorrowedBooks
+                    .Where(bb => bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed && bb.DueDate.Date == DateTime.Today.AddDays(1).Date)
+                    .Include(bb => bb.User)
+                    .Include(bb => bb.BookCopy)
+                    .ThenInclude(bc => bc.Book)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error fetching borrowed books due tomorrow");
+                throw new RepositoryException("Error fetching borrowed books due tomorrow", ex);
+            }
+        }
+
+        public async Task<IList<BorrowedBookEmailDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync()
+        {
+            try
+            {
+                var tomorrow = DateTime.Today.AddDays(1);
+
+                return await dbContext.BorrowedBooks
+                    .Where(bb => bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed
+                              && bb.DueDate.Date == tomorrow)
+                    .Select(bb => new BorrowedBookEmailDTO
+                    {
+                        BookTitle = bb.BookCopy.Book.Title,
+                        UserFullName = bb.User.FirstName + " " + bb.User.LastName,
+                        UserEmail = bb.User.Email,
+                        BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
+                        DueDate = bb.DueDate.ToString("yyyy-MM-dd") 
+                    })
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error fetching borrowed books due tomorrow");
+                throw new RepositoryException("Error fetching borrowed books due tomorrow", ex);
+            }
+        }
+
     }
 }

@@ -14,7 +14,7 @@ namespace LibraryManagementSystem.Mappers
                 CopyId = bookCopy.CopyId,
                 BookId = bookCopy.BookId,
                 IsAvailable = bookCopy.IsAvailable,
-                Book = bookCopy.Book != null ? BookMapper.FromModel(bookCopy.Book) : null
+                BookName = bookCopy.Book.Title,
             };
             return bookCopyDto;
         }

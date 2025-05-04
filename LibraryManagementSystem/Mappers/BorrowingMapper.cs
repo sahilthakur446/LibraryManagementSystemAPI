@@ -12,9 +12,10 @@ namespace LibraryManagementSystem.Mappers
                 BorrowId = book.BorrowId,
                 UserId = book.UserId,
                 UserName = $"{book.User?.FirstName} {book.User?.LastName}" ?? "N/A",
+                CopyBookId = book.BookCopyId,
                 BookId = book.BookCopy.BookId,
                 BookName = book.BookCopy.Book?.Title ?? "N/A",
-                BorrowDate = book.BorrowDate?.ToString("yyyy-MM-dd") ?? "N/A",
+                BorrowDate = book.BorrowDate.ToString("yyyy-MM-dd"),
                 DueDate = book.DueDate.ToString("yyyy-MM-dd"),
                 ReturnDate = book.ReturnDate?.ToString("yyyy-MM-dd") ?? "Not Returned",
                 FineAmount = book.FineAmount,
@@ -27,7 +28,6 @@ namespace LibraryManagementSystem.Mappers
             return new BorrowedBook
             {
                 UserId = book.UserId,
-                BookId = book.BookId,
                 BookCopyId = book.BookCopyId,
             };
         }

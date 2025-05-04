@@ -1,10 +1,12 @@
-﻿namespace LibraryManagementSystem.Services.Interfaces
+﻿using LibraryManagementSystem.DTOs.Borrowing;
+
+namespace LibraryManagementSystem.Services.Interfaces
 {
     public interface IEmailService
     {
         Task SendBookIssuedEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate);
         Task SendBookReturnedEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate, DateTime returnDate);
-        Task SendReturnDueTomorrowEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate);
+        Task SendReturnDueTomorrowEmailAsync(BorrowedBookEmailDTO dueTomorrowBook);
         Task SendOverdueFineReminderEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate);
 
     }

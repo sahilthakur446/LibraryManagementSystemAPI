@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using System.Net.Mail;
 using System.Net;
+using LibraryManagementSystem.DTOs.Borrowing;
 
 public class EmailService : IEmailService
 {
@@ -141,7 +142,7 @@ public class EmailService : IEmailService
         }
     }
 
-    public async Task SendReturnDueTomorrowEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate)
+    public async Task SendReturnDueTomorrowEmailAsync(BorrowedBookEmailDTO dueTomorrowBook)
     {
         try
         {
@@ -149,10 +150,11 @@ public class EmailService : IEmailService
             string emailBody = await File.ReadAllTextAsync(filePath);
 
             emailBody = emailBody
-                .Replace("{{UserName}}", userName)
-                .Replace("{{IssueDate}}", issueDate.ToString("dd MMM yyyy"))
-                .Replace("{{ReturnDate}}", dueDate.ToString("dd MMM yyyy"))
-                .Replace("{{FinePerDay}}", "5");
+            .Replace("{{UserName}}", dueTomorrowBook.UserFullName)
+            .Replace("{{BookTitle}}", dueTomorrowBook.BookTitle)
+            .Replace("{{IssueDate}}", dueTomorrowBook.BorrowDate)
+            .Replace("{{DueDate}}", dueTomorrowBook.DueDate)
+            .Replace("{{FinePerDay}}", "5");
 
             var mail = new MailMessage
             {
@@ -161,7 +163,7 @@ public class EmailService : IEmailService
                 Body = emailBody,
                 IsBodyHtml = true
             };
-            mail.To.Add(toEmail);
+            mail.To.Add(dueTomorrowBook.UserEmail);
 
             using var smtp = new SmtpClient(_emailSettings.SmtpServer, _emailSettings.Port)
             {
@@ -173,7 +175,7 @@ public class EmailService : IEmailService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send book return reminder email to {Email}", toEmail);
+            _logger.LogError(ex, "Failed to send book return reminder email to {Email}", dueTomorrowBook.UserEmail);
         }
     }
 }

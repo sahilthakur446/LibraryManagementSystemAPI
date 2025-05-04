@@ -12,6 +12,8 @@ using Serilog.Formatting;
 using Microsoft.EntityFrameworkCore;
 using LibraryManagementSystem.Repositories.EF;
 using LibraryManagementSystem.Settings;
+using LibraryManagementSystem.Models;
+using LibraryManagementSystem.BackgroundServices;
 Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Error()
             .WriteTo.File(
@@ -25,11 +27,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSerilog();
 
-builder.Services.
-    AddDbContext<LibraryManagementSystem.Models.LibraryDbContext>(options => 
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<LibraryDbContext>(options =>
+{
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .LogTo(Console.WriteLine, LogLevel.Information) // ? This logs to console
+           .EnableSensitiveDataLogging(); // ?? Optional, shows parameter values
+});
+
 
 builder.Services.AddControllers();
+builder.Services.AddHostedService<EmailBackgroundService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();

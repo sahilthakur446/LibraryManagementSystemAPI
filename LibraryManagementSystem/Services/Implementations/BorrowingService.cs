@@ -1,8 +1,11 @@
 ﻿using LibraryManagementSystem.DTOs.Borrowing;
 using LibraryManagementSystem.Exceptions;
 using LibraryManagementSystem.Mappers;
+using LibraryManagementSystem.Models;
+using LibraryManagementSystem.Repositories.EF;
 using LibraryManagementSystem.Repositories.Interfaces;
 using LibraryManagementSystem.Services.Interfaces;
+using System.Collections.Generic;
 
 namespace LibraryManagementSystem.Services.Implementations
 {
@@ -19,17 +22,20 @@ namespace LibraryManagementSystem.Services.Implementations
             this.logger = logger;
         }
 
-        public async Task<BorrowingResponseDTO> BorrowBookAsync(int bookId, int userId)
+        public async Task<BorrowingResponseDTO> BorrowBookAsync(int bookId, int userId, int bookCopyId = 0)
         {
             try
             {
-
                 var borrowedBooks = await borrowingRepository.GetBorrowedBooksByUserIdAsync(userId);
                 if (borrowedBooks.Count >= 3)
                 {
                     throw new BusinessExceptions("Borrowing limit reached. You cannot borrow more than 3 books.", StatusCodes.Status200OK);
                 }
-
+                var isSameBookAlreadyBorrowedByUser = await IsSameBookAlreadyBorrowedByUser(bookId,userId);
+                if (isSameBookAlreadyBorrowedByUser) 
+                {
+                    throw new BusinessExceptions("This book is already borrowed by the user.", StatusCodes.Status400BadRequest);
+                }
                 var availableCopies = await borrowingRepository.GetAvailableBookCopiesAsync(bookId);
                 if (availableCopies == 0)
                 {
@@ -41,18 +47,13 @@ namespace LibraryManagementSystem.Services.Implementations
                 {
                     throw new BusinessExceptions("Outstanding fine exceeds limit. Please repay your dues before borrowing more books.", StatusCodes.Status400BadRequest);
                 }
-
-                var borrowedBook = await borrowingRepository.BorrowBookAsync(bookId, userId);
+                var borrowedBook = await borrowingRepository.BorrowBookAsync(bookId, userId, bookCopyId);
                 string userName = $"{borrowedBook.User.FirstName} {borrowedBook.User.LastName}";
-                if (borrowedBook.BorrowDate == null)
-                {
-                    throw new BusinessExceptions("Borrow date is missing.", StatusCodes.Status500InternalServerError);
-                }
-                DateTime returnDate = borrowedBook.BorrowDate.Value.AddDays(14);
+                DateTime returnDate = borrowedBook.BorrowDate.AddDays(14);
                 await emailService.SendBookIssuedEmailAsync(
                     borrowedBook.User.Email,
                     userName,
-                    borrowedBook.BorrowDate.Value,
+                    borrowedBook.BorrowDate,
                     returnDate
                 );
                 return BorrowingMapper.FromModel(borrowedBook);
@@ -78,7 +79,7 @@ namespace LibraryManagementSystem.Services.Implementations
                 await emailService.SendBookReturnedEmailAsync(
                     returnedBook.User.Email,
                     userName,
-                    returnedBook.BorrowDate!.Value, returnedBook.DueDate, DateTime.UtcNow.Date
+                    returnedBook.BorrowDate, returnedBook.DueDate, DateTime.UtcNow.Date
                 );
                 return BorrowingMapper.FromModel(returnedBook);
             }
@@ -108,7 +109,7 @@ namespace LibraryManagementSystem.Services.Implementations
                 await emailService.SendBookReturnedEmailAsync(
                     returnedBook.User.Email,
                     userName,
-                    returnedBook.BorrowDate!.Value,
+                    returnedBook.BorrowDate,
                     returnedBook.DueDate,
                     DateTime.UtcNow.Date
                 );
@@ -202,6 +203,58 @@ namespace LibraryManagementSystem.Services.Implementations
             {
                 logger.LogError(ex, "Error while calculating remaining fine for UserId: {UserId}", userId);
                 throw new BusinessExceptions("Could not fetch remaining fine.", StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        public async Task<bool> IsSameBookAlreadyBorrowedByUser(int bookId, int userId)
+        {
+            try
+            {
+                var borrowedBooks = await borrowingRepository.GetBorrowedBooksByUserIdAsync(userId);
+
+                if (borrowedBooks == null || !borrowedBooks.Any())
+                {
+                    return false;
+                }
+
+                return borrowedBooks.Any(b => b.BookCopy.BookId == bookId);
+            }
+            catch (RepositoryException ex)
+            {
+                logger.LogError(ex, "Error checking if the user has already borrowed the book. UserId: {UserId}, BookId: {BookId}", userId, bookId);
+                throw new BusinessExceptions("An error occurred while checking the borrowed book status.", StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        public async Task<IList<BorrowingResponseDTO>> GetBorrowingsDueTomorrowAsync()
+        {
+            try
+            {
+                var borrowingsDueTomorrow = await borrowingRepository.GetAllBorrowedBooksDueTomorrowAsync();
+
+                return borrowingsDueTomorrow
+                    .Select(BorrowingMapper.FromModel)
+                    .ToList();
+            }
+            catch (RepositoryException ex)
+            {
+                logger.LogError(ex, "Error while retrieving borrowings due tomorrow.");
+                throw new BusinessExceptions("An error occurred while fetching borrowings due tomorrow.", StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        public async Task<IList<BorrowedBookEmailDTO>> GetBorrowedBooksDueTomorrowForEmailAsync()
+        {
+            try
+            {
+                var borrowingsDueTomorrow = await borrowingRepository.GetAllBorrowedBooksDueTomorrowForEmailAsync();
+
+                return borrowingsDueTomorrow;
+            }
+            catch (RepositoryException ex)
+            {
+                logger.LogError(ex, "Error while retrieving borrowings due tomorrow for email.");
+                throw new BusinessExceptions("An error occurred while fetching borrowings.", StatusCodes.Status500InternalServerError);
             }
         }
     }
