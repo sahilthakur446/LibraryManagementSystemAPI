@@ -198,5 +198,22 @@ namespace LibraryManagementSystem.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
             }
         }
+
+        [HttpGet("due-email")]
+        [ProducesResponseType(typeof(IList<BorrowedBookEmailDTO>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetAllOverDueBooksForEmail()
+        {
+            try
+            {
+                var borrowings = await borrowingService.GetAllOverDueBooksForEmailAsync();
+                return Ok(borrowings);
+            }
+            catch (BusinessExceptions ex)
+            {
+                logger.LogError(ex, "Failed to get borrowings due tomorrow.");
+                return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            }
+        }
     }
 }

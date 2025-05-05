@@ -100,24 +100,21 @@ public class EmailService : IEmailService
     }
 
 
-    public async Task SendOverdueFineReminderEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate)
+    public async Task SendOverdueFineReminderEmailAsync(BorrowedBookEmailDTO dueTomorrowBook)
     {
         try
         {
             string filePath = Path.Combine(_env.ContentRootPath, "EmailTemplates", "BookOverdueReminderTemplate.html");
             string emailBody = await File.ReadAllTextAsync(filePath);
 
-            int finePerDay = 5;
-            int overdueDays = (DateTime.Today - dueDate).Days;
-            int totalFine = finePerDay * overdueDays;
-
             emailBody = emailBody
-                .Replace("{{UserName}}", userName)
-                .Replace("{{IssueDate}}", issueDate.ToString("dd MMM yyyy"))
-                .Replace("{{ReturnDate}}", dueDate.ToString("dd MMM yyyy"))
-                .Replace("{{OverdueDays}}", overdueDays.ToString())
-                .Replace("{{FinePerDay}}", finePerDay.ToString())
-                .Replace("{{TotalFine}}", totalFine.ToString());
+                .Replace("{{BookTitle}}", dueTomorrowBook.BookTitle)
+                .Replace("{{UserName}}", dueTomorrowBook.UserFullName)
+                .Replace("{{IssueDate}}", dueTomorrowBook.BorrowDate)
+                .Replace("{{DueDate}}", dueTomorrowBook.DueDate)
+                .Replace("{{OverdueDays}}", dueTomorrowBook.OverdueDays.ToString())
+                .Replace("{{FinePerDay}}", dueTomorrowBook.FinePerDay.ToString())
+                .Replace("{{TotalFine}}", dueTomorrowBook.TotalFine.ToString());
 
             var mail = new MailMessage
             {
@@ -126,7 +123,7 @@ public class EmailService : IEmailService
                 Body = emailBody,
                 IsBodyHtml = true
             };
-            mail.To.Add(toEmail);
+            mail.To.Add(dueTomorrowBook.UserEmail);
 
             using var smtp = new SmtpClient(_emailSettings.SmtpServer, _emailSettings.Port)
             {
@@ -138,7 +135,7 @@ public class EmailService : IEmailService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send overdue fine reminder email to {Email}", toEmail);
+            _logger.LogError(ex, "Failed to send overdue fine reminder email to {Email}", dueTomorrowBook.UserEmail);
         }
     }
 

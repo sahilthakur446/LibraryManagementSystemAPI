@@ -3,6 +3,7 @@ using LibraryManagementSystem.Enums;
 using LibraryManagementSystem.Exceptions;
 using LibraryManagementSystem.Models;
 using LibraryManagementSystem.Repositories.Interfaces;
+using LibraryManagementSystem.Settings;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryManagementSystem.Repositories.EF
@@ -376,27 +377,6 @@ namespace LibraryManagementSystem.Repositories.EF
                 throw;
             }
         }
-
-        private async Task<int> AutoSelectBookCopy(int bookId)
-        {
-            try
-            {
-                var bookCopy = await dbContext.BookCopies
-                    .Where(bc => bc.BookId == bookId && bc.IsAvailable)
-                    .FirstOrDefaultAsync();
-
-                if (bookCopy == null)
-                {
-                    throw new RepositoryException($"No available copy found for BookId: {bookId}");
-                }
-                return bookCopy.CopyId;
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, $"Error in AutoSelectBookCopy for BookId: {bookId}");
-                throw new RepositoryException("Error selecting available book copy.", ex);
-            }
-        }
         public async Task<IList<BorrowedBook>> GetAllBorrowedBooksDueTomorrowAsync()
         {
             try
@@ -414,6 +394,38 @@ namespace LibraryManagementSystem.Repositories.EF
                 throw new RepositoryException("Error fetching borrowed books due tomorrow", ex);
             }
         }
+        public async Task<IList<BorrowedBookEmailDTO>> GetAllOverDueBooksForEmailAsync()
+        {
+            try
+            {
+                var today = DateTime.Today;
+
+                var overdueBooksQuery = dbContext.BorrowedBooks
+                     .Where(bb => (bb.DueDate < today && bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed) || bb.StatusId == (int)BorrowedBookStatusEnum.Overdue)
+                    .Include(bb => bb.User)
+                    .Include(bb => bb.BookCopy)
+                        .ThenInclude(bc => bc.Book)
+                        .AsNoTracking()
+                    .Select(bb => new BorrowedBookEmailDTO
+                    {
+                        BookTitle = bb.BookCopy.Book.Title,
+                        UserFullName = $"{bb.User.FirstName} {bb.User.LastName}",
+                        UserEmail = bb.User.Email,
+                        BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
+                        DueDate = bb.DueDate.ToString("yyyy-MM-dd"),
+                        OverdueDays = (today - bb.DueDate).Days,
+                        FinePerDay = LibrarySettings.FinePerDay,
+                        TotalFine = Math.Max((today - bb.DueDate).Days * 5, 0)
+                    });
+
+                return await overdueBooksQuery.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error fetching overdue books for email.");
+                throw new RepositoryException("Error fetching overdue books for email.", ex);
+            }
+        }
 
         public async Task<IList<BorrowedBookEmailDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync()
         {
@@ -421,25 +433,81 @@ namespace LibraryManagementSystem.Repositories.EF
             {
                 var tomorrow = DateTime.Today.AddDays(1);
 
-                return await dbContext.BorrowedBooks
+                var dueTomorrowQuery = dbContext.BorrowedBooks
                     .Where(bb => bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed
                               && bb.DueDate.Date == tomorrow)
+                    .Include(bb => bb.User)
+                    .Include(bb => bb.BookCopy)
+                        .ThenInclude(bc => bc.Book)
+                    .AsNoTracking() // Optimization for read-only data
                     .Select(bb => new BorrowedBookEmailDTO
                     {
                         BookTitle = bb.BookCopy.Book.Title,
-                        UserFullName = bb.User.FirstName + " " + bb.User.LastName,
+                        UserFullName = $"{bb.User.FirstName} {bb.User.LastName}",
                         UserEmail = bb.User.Email,
                         BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
-                        DueDate = bb.DueDate.ToString("yyyy-MM-dd") 
-                    })
-                    .ToListAsync();
+                        DueDate = bb.DueDate.ToString("yyyy-MM-dd"),
+                    });
+
+                return await dueTomorrowQuery.ToListAsync();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error fetching borrowed books due tomorrow");
-                throw new RepositoryException("Error fetching borrowed books due tomorrow", ex);
+                logger.LogError(ex, "Error fetching borrowed books due tomorrow.");
+                throw new RepositoryException("Error fetching borrowed books due tomorrow.", ex);
             }
         }
+        public async Task<bool> UpdateOverdueBooksStatusAsync()
+        {
+            try
+            {
+                var today = DateTime.UtcNow.Date;
 
+                // Fetch all borrowed books whose due date has passed
+                var overdueBooks = await dbContext.BorrowedBooks
+                     .Where(bb => (bb.DueDate < today && bb.StatusId == (int)BorrowedBookStatusEnum.Borrowed) || bb.StatusId == (int)BorrowedBookStatusEnum.Overdue)
+                    .ToListAsync();
+
+                if (!overdueBooks.Any())
+                {
+                    return true;
+                }
+
+                foreach (var book in overdueBooks)
+                {
+                    book.StatusId = (int)BorrowedBookStatusEnum.Overdue;
+                    book.FineAmount = Math.Max((today - book.DueDate).Days * 5, 0);
+                }
+
+                await dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error updating borrowing status for overdue books.");
+                throw new RepositoryException("Error updating borrowing status for overdue books.", ex);
+            }
+        }
+        private async Task<int> AutoSelectBookCopy(int bookId)
+        {
+            try
+            {
+                var bookCopy = await dbContext.BookCopies
+                    .Where(bc => bc.BookId == bookId && bc.IsAvailable)
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync();
+
+                if (bookCopy == null)
+                {
+                    throw new RepositoryException($"No available copy found for BookId: {bookId}");
+                }
+                return bookCopy.CopyId;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"Error in AutoSelectBookCopy for BookId: {bookId}");
+                throw new RepositoryException("Error selecting available book copy.", ex);
+            }
+        }
     }
 }

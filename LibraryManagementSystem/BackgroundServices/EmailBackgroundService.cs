@@ -24,19 +24,18 @@ namespace LibraryManagementSystem.BackgroundServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            Console.WriteLine("Email background service is starting.");
             _logger.LogInformation("Email background service is starting.");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    _logger.LogInformation("Checking for emails to send...");
+                    _logger.LogInformation("Checking for due and overdue emails to send...");
                     await ProcessDueEmails(stoppingToken);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occurred while processing due emails");
+                    _logger.LogError(ex, "An error occurred while processing due or overdue emails.");
                 }
 
                 await Task.Delay(_interval, stoppingToken);
@@ -47,33 +46,54 @@ namespace LibraryManagementSystem.BackgroundServices
 
         private async Task ProcessDueEmails(CancellationToken stoppingToken)
         {
-            using (var scope = _serviceProvider.CreateScope())
+            using var scope = _serviceProvider.CreateScope();
+
+            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+            var borrowingService = scope.ServiceProvider.GetRequiredService<IBorrowingService>();
+
+            var dueTomorrowBooks = await borrowingService.GetBorrowedBooksDueTomorrowForEmailAsync();
+
+            bool statusUpdateResult = await borrowingService.UpdateOverdueBooksStatusAsync();
+            _logger.LogInformation("Overdue book status update result: {Status}", statusUpdateResult);
+
+            var overdueBooks = await borrowingService.GetAllOverDueBooksForEmailAsync();
+
+            foreach (var book in dueTomorrowBooks)
             {
-                var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                var borrowingService = scope.ServiceProvider.GetRequiredService<IBorrowingService>();
+                if (stoppingToken.IsCancellationRequested)
+                    break;
 
-                var dueTomorrowBooks = await borrowingService.GetBorrowedBooksDueTomorrowForEmailAsync();
-
-                foreach (var book in dueTomorrowBooks)
+                try
                 {
-                    if (stoppingToken.IsCancellationRequested)
-                        break;
-
-                    try
-                    {
-                        await emailService.SendReturnDueTomorrowEmailAsync(book);
-
-                        _logger.LogInformation("Sent due tomorrow notification to {UserEmail} for book borrowed on {BorrowDate}",
-                            book.UserEmail, book.BorrowDate);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to send due tomorrow email to {UserEmail}", book.UserEmail);
-                    }
+                    await emailService.SendReturnDueTomorrowEmailAsync(book);
+                    _logger.LogInformation("Sent 'due tomorrow' notification to {UserEmail} for book borrowed on {BorrowDate}",
+                        book.UserEmail, book.BorrowDate);
                 }
-
-                _logger.LogInformation("Processed {Count} due tomorrow notifications", dueTomorrowBooks.Count());
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send 'due tomorrow' email to {UserEmail}", book.UserEmail);
+                }
             }
+
+            foreach (var book in overdueBooks)
+            {
+                if (stoppingToken.IsCancellationRequested)
+                    break;
+
+                try
+                {
+                    await emailService.SendOverdueFineReminderEmailAsync(book);
+                    _logger.LogInformation("Sent 'overdue' fine reminder to {UserEmail} for book borrowed on {BorrowDate}",
+                        book.UserEmail, book.BorrowDate);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send 'overdue' fine reminder to {UserEmail}", book.UserEmail);
+                }
+            }
+
+            _logger.LogInformation("Processed {DueCount} due tomorrow notifications and {OverdueCount} overdue notifications",
+                dueTomorrowBooks.Count(), overdueBooks.Count());
         }
     }
 }

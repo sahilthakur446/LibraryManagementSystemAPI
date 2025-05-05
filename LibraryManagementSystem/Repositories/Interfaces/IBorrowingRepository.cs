@@ -15,5 +15,7 @@ namespace LibraryManagementSystem.Repositories.Interfaces
         Task<IList<BorrowedBook>> GetAllOverDueBooksAsync();
         Task<IList<BorrowedBook>> GetAllBorrowedBooksDueTomorrowAsync();
         Task<IList<BorrowedBookEmailDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync();
+        Task<IList<BorrowedBookEmailDTO>> GetAllOverDueBooksForEmailAsync();
+        Task<bool> UpdateOverdueBooksStatusAsync();
     }
 }

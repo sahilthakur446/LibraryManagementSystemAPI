@@ -7,7 +7,7 @@ namespace LibraryManagementSystem.Services.Interfaces
         Task SendBookIssuedEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate);
         Task SendBookReturnedEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate, DateTime returnDate);
         Task SendReturnDueTomorrowEmailAsync(BorrowedBookEmailDTO dueTomorrowBook);
-        Task SendOverdueFineReminderEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate);
+        Task SendOverdueFineReminderEmailAsync(BorrowedBookEmailDTO dueTomorrowBook);
 
     }
 

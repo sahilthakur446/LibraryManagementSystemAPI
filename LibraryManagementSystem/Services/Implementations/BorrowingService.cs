@@ -31,8 +31,8 @@ namespace LibraryManagementSystem.Services.Implementations
                 {
                     throw new BusinessExceptions("Borrowing limit reached. You cannot borrow more than 3 books.", StatusCodes.Status200OK);
                 }
-                var isSameBookAlreadyBorrowedByUser = await IsSameBookAlreadyBorrowedByUser(bookId,userId);
-                if (isSameBookAlreadyBorrowedByUser) 
+                var isSameBookAlreadyBorrowedByUser = await IsSameBookAlreadyBorrowedByUser(bookId, userId);
+                if (isSameBookAlreadyBorrowedByUser)
                 {
                     throw new BusinessExceptions("This book is already borrowed by the user.", StatusCodes.Status400BadRequest);
                 }
@@ -255,6 +255,35 @@ namespace LibraryManagementSystem.Services.Implementations
             {
                 logger.LogError(ex, "Error while retrieving borrowings due tomorrow for email.");
                 throw new BusinessExceptions("An error occurred while fetching borrowings.", StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        public async Task<IList<BorrowedBookEmailDTO>> GetAllOverDueBooksForEmailAsync()
+        {
+            try
+            {
+                var overdueBorrowings = await borrowingRepository.GetAllOverDueBooksForEmailAsync();
+
+                return overdueBorrowings;
+            }
+            catch (RepositoryException ex)
+            {
+                logger.LogError(ex, "Error while retrieving borrowings due tomorrow for email.");
+                throw new BusinessExceptions("An error occurred while fetching borrowings.", StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        public async Task<bool> UpdateOverdueBooksStatusAsync()
+        {
+            try
+            {
+                bool updateSuccessful = await borrowingRepository.UpdateOverdueBooksStatusAsync();
+                return updateSuccessful;
+            }
+            catch (RepositoryException ex)
+            {
+                logger.LogError(ex, "Error while updating overdue book statuses.");
+                throw new BusinessExceptions("An error occurred while updating overdue book statuses.", StatusCodes.Status500InternalServerError, ex);
             }
         }
     }

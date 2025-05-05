@@ -14,6 +14,8 @@ namespace LibraryManagementSystem.Services.Interfaces
         Task<IList<BorrowingResponseDTO>> GetAllOverDueBooksAsync();
         Task<IList<BorrowingResponseDTO>> GetBorrowingsDueTomorrowAsync();
         Task<IList<BorrowedBookEmailDTO>> GetBorrowedBooksDueTomorrowForEmailAsync();
+        Task<IList<BorrowedBookEmailDTO>> GetAllOverDueBooksForEmailAsync();
+        Task<bool> UpdateOverdueBooksStatusAsync();
         Task<bool> IsSameBookAlreadyBorrowedByUser(int bookId, int userId);
     }
 }

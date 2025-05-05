@@ -9,6 +9,9 @@ namespace LibraryManagementSystem.DTOs.Borrowing
         public string UserEmail { get; set; }
         public string BorrowDate { get; set; }
         public string DueDate { get; set; }
+        public int OverdueDays { get; set; }
+        public int FinePerDay { get; set; }
+        public int TotalFine { get; set; }
     }
 
 }
