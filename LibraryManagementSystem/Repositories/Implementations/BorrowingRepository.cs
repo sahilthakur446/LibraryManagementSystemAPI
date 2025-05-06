@@ -394,7 +394,7 @@ namespace LibraryManagementSystem.Repositories.EF
                 throw new RepositoryException("Error fetching borrowed books due tomorrow", ex);
             }
         }
-        public async Task<IList<BorrowedBookEmailDTO>> GetAllOverDueBooksForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForEmailAsync()
         {
             try
             {
@@ -406,16 +406,15 @@ namespace LibraryManagementSystem.Repositories.EF
                     .Include(bb => bb.BookCopy)
                         .ThenInclude(bc => bc.Book)
                         .AsNoTracking()
-                    .Select(bb => new BorrowedBookEmailDTO
+                    .Select(bb => new BorrowedBookNotificationDTO
                     {
                         BookTitle = bb.BookCopy.Book.Title,
-                        UserFullName = $"{bb.User.FirstName} {bb.User.LastName}",
+                        UserName = $"{bb.User.FirstName} {bb.User.LastName}",
                         UserEmail = bb.User.Email,
                         BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
                         DueDate = bb.DueDate.ToString("yyyy-MM-dd"),
-                        OverdueDays = (today - bb.DueDate).Days,
-                        FinePerDay = LibrarySettings.FinePerDay,
-                        TotalFine = Math.Max((today - bb.DueDate).Days * 5, 0)
+                        OverdueDays = (today - bb.DueDate).Days.ToString(),
+                        TotalFine = Math.Max((today - bb.DueDate).Days * 5, 0).ToString()
                     });
 
                 return await overdueBooksQuery.ToListAsync();
@@ -427,7 +426,7 @@ namespace LibraryManagementSystem.Repositories.EF
             }
         }
 
-        public async Task<IList<BorrowedBookEmailDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync()
         {
             try
             {
@@ -440,10 +439,10 @@ namespace LibraryManagementSystem.Repositories.EF
                     .Include(bb => bb.BookCopy)
                         .ThenInclude(bc => bc.Book)
                     .AsNoTracking() // Optimization for read-only data
-                    .Select(bb => new BorrowedBookEmailDTO
+                    .Select(bb => new BorrowedBookNotificationDTO
                     {
                         BookTitle = bb.BookCopy.Book.Title,
-                        UserFullName = $"{bb.User.FirstName} {bb.User.LastName}",
+                        UserName = $"{bb.User.FirstName} {bb.User.LastName}",
                         UserEmail = bb.User.Email,
                         BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
                         DueDate = bb.DueDate.ToString("yyyy-MM-dd"),

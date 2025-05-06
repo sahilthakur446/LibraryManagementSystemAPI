@@ -5,8 +5,10 @@ using Microsoft.Extensions.Logging;
 using System.Net.Mail;
 using System.Net;
 using LibraryManagementSystem.DTOs.Borrowing;
+using LibraryManagementSystem.DTOs.Notification;
+using LibraryManagementSystem.Models;
 
-public class EmailService : IEmailService
+public class EmailService : INotificationService
 {
     private readonly EmailSettings _emailSettings;
     private readonly IWebHostEnvironment _env;
@@ -19,111 +21,63 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task SendBookIssuedEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate)
+    public async Task SendAsync(NotificationMessage notificationMessage)
     {
-        try
+        var borrowedBook = notificationMessage.borrowedBookDetails;
+
+        switch (notificationMessage.NotificationType)
         {
-            string filePath = Path.Combine(_env.ContentRootPath, "EmailTemplates", "BookIssuedTemplate.html");
-            string emailBody = await File.ReadAllTextAsync(filePath);
-
-            emailBody = emailBody
-                .Replace("{{UserName}}", userName)
-                .Replace("{{IssueDate}}", issueDate.ToString("dd MMM yyyy"))
-                .Replace("{{ReturnDate}}", dueDate.ToString("dd MMM yyyy"))
-                .Replace("{{FinePerDay}}", "5");
-
-            var mail = new MailMessage
-            {
-                From = new MailAddress(_emailSettings.SenderEmail),
-                Subject = "📚 Book Issued Notification",
-                Body = emailBody,
-                IsBodyHtml = true
-            };
-            mail.To.Add(toEmail);
-
-            using var smtp = new SmtpClient(_emailSettings.SmtpServer, _emailSettings.Port)
-            {
-                Credentials = new NetworkCredential(_emailSettings.SenderEmail, _emailSettings.Password),
-                EnableSsl = true
-            };
-
-            await smtp.SendMailAsync(mail);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send book issued email to {Email}", toEmail);
+            case LibraryManagementSystem.Enums.NotificationType.BookIssued:
+                await SendEmailWithTemplateAsync(borrowedBook, "BookIssuedTemplate.html", "📚 Book Issued Notification");
+                break;
+            case LibraryManagementSystem.Enums.NotificationType.BookReturned:
+                await SendEmailWithTemplateAsync(borrowedBook, "BookReturnedTemplate.html", "📚 Book Returned Notification");
+                break;
+            case LibraryManagementSystem.Enums.NotificationType.ReturnDueTomorrow:
+                await SendEmailWithTemplateAsync(borrowedBook, "BookReturnReminderTemplate.html", "⏰ Reminder: Return Book Tomorrow");
+                break;
+            case LibraryManagementSystem.Enums.NotificationType.OverdueFineReminder:
+                await SendEmailWithTemplateAsync(borrowedBook, "BookOverdueReminderTemplate.html", "⚠️ Overdue Book Reminder");
+                break;
         }
     }
 
-    public async Task SendBookReturnedEmailAsync(string toEmail, string userName, DateTime issueDate, DateTime dueDate, DateTime returnDate)
+    private async Task SendEmailWithTemplateAsync(BorrowedBookNotificationDTO book, string templateFileName, string subject)
     {
         try
         {
-            string filePath = Path.Combine(_env.ContentRootPath, "EmailTemplates", "BookReturnedTemplate.html");
-            string emailBody = await File.ReadAllTextAsync(filePath);
-
-            // Calculate fine if returnDate is later than dueDate
-            int fineAmount = returnDate > dueDate ? (returnDate - dueDate).Days * 5 : 0;
-
-            // Replace placeholders in the HTML template
-            emailBody = emailBody
-                .Replace("{{UserName}}", userName)
-                .Replace("{{IssueDate}}", issueDate.ToString("dd MMM yyyy"))
-                .Replace("{{DueDate}}", dueDate.ToString("dd MMM yyyy"))
-                .Replace("{{ReturnDate}}", returnDate.ToString("dd MMM yyyy"))
-                .Replace("{{FinePerDay}}", "5")
-                .Replace("{{FineAmount}}", fineAmount.ToString());
-
-            // Prepare email
-            var mail = new MailMessage
-            {
-                From = new MailAddress(_emailSettings.SenderEmail),
-                Subject = "📚 Book Returned Notification",
-                Body = emailBody,
-                IsBodyHtml = true
-            };
-            mail.To.Add(toEmail);
-
-            // Setup SMTP client
-            using var smtp = new SmtpClient(_emailSettings.SmtpServer, _emailSettings.Port)
-            {
-                Credentials = new NetworkCredential(_emailSettings.SenderEmail, _emailSettings.Password),
-                EnableSsl = true
-            };
-
-            await smtp.SendMailAsync(mail);
+            string filePath = Path.Combine(_env.ContentRootPath, "EmailTemplates", templateFileName);
+            await GenerateAndSendEmailAsync(book, filePath, subject);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send book returned email to {Email}", toEmail);
+            _logger.LogError(ex, "Failed to send '{Subject}' email to {Email}", subject, book.UserEmail);
         }
     }
 
-
-    public async Task SendOverdueFineReminderEmailAsync(BorrowedBookEmailDTO dueTomorrowBook)
+    private async Task GenerateAndSendEmailAsync(BorrowedBookNotificationDTO book, string filePath, string subject)
     {
         try
         {
-            string filePath = Path.Combine(_env.ContentRootPath, "EmailTemplates", "BookOverdueReminderTemplate.html");
             string emailBody = await File.ReadAllTextAsync(filePath);
 
             emailBody = emailBody
-                .Replace("{{BookTitle}}", dueTomorrowBook.BookTitle)
-                .Replace("{{UserName}}", dueTomorrowBook.UserFullName)
-                .Replace("{{IssueDate}}", dueTomorrowBook.BorrowDate)
-                .Replace("{{DueDate}}", dueTomorrowBook.DueDate)
-                .Replace("{{OverdueDays}}", dueTomorrowBook.OverdueDays.ToString())
-                .Replace("{{FinePerDay}}", dueTomorrowBook.FinePerDay.ToString())
-                .Replace("{{TotalFine}}", dueTomorrowBook.TotalFine.ToString());
+                .Replace("{{BookTitle}}", book.BookTitle)
+                .Replace("{{UserName}}", book.UserName)
+                .Replace("{{IssueDate}}", book.BorrowDate)
+                .Replace("{{DueDate}}", book.DueDate)
+                .Replace("{{OverdueDays}}", book.OverdueDays.ToString())
+                .Replace("{{FinePerDay}}", book.FinePerDay.ToString())
+                .Replace("{{TotalFine}}", book.TotalFine.ToString());
 
             var mail = new MailMessage
             {
                 From = new MailAddress(_emailSettings.SenderEmail),
-                Subject = "⚠️ Overdue Book Reminder",
+                Subject = subject,
                 Body = emailBody,
                 IsBodyHtml = true
             };
-            mail.To.Add(dueTomorrowBook.UserEmail);
+            mail.To.Add(book.UserEmail);
 
             using var smtp = new SmtpClient(_emailSettings.SmtpServer, _emailSettings.Port)
             {
@@ -135,44 +89,8 @@ public class EmailService : IEmailService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send overdue fine reminder email to {Email}", dueTomorrowBook.UserEmail);
-        }
-    }
-
-    public async Task SendReturnDueTomorrowEmailAsync(BorrowedBookEmailDTO dueTomorrowBook)
-    {
-        try
-        {
-            string filePath = Path.Combine(_env.ContentRootPath, "EmailTemplates", "BookReturnReminderTemplate.html");
-            string emailBody = await File.ReadAllTextAsync(filePath);
-
-            emailBody = emailBody
-            .Replace("{{UserName}}", dueTomorrowBook.UserFullName)
-            .Replace("{{BookTitle}}", dueTomorrowBook.BookTitle)
-            .Replace("{{IssueDate}}", dueTomorrowBook.BorrowDate)
-            .Replace("{{DueDate}}", dueTomorrowBook.DueDate)
-            .Replace("{{FinePerDay}}", "5");
-
-            var mail = new MailMessage
-            {
-                From = new MailAddress(_emailSettings.SenderEmail),
-                Subject = "⏰ Reminder: Return Book Tomorrow",
-                Body = emailBody,
-                IsBodyHtml = true
-            };
-            mail.To.Add(dueTomorrowBook.UserEmail);
-
-            using var smtp = new SmtpClient(_emailSettings.SmtpServer, _emailSettings.Port)
-            {
-                Credentials = new NetworkCredential(_emailSettings.SenderEmail, _emailSettings.Password),
-                EnableSsl = true
-            };
-
-            await smtp.SendMailAsync(mail);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send book return reminder email to {Email}", dueTomorrowBook.UserEmail);
+            _logger.LogError(ex, "Failed to generate or send email to {Email}", book.UserEmail);
+            throw;
         }
     }
 }

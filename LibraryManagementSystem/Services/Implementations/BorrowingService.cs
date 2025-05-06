@@ -243,7 +243,7 @@ namespace LibraryManagementSystem.Services.Implementations
             }
         }
 
-        public async Task<IList<BorrowedBookEmailDTO>> GetBorrowedBooksDueTomorrowForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationDTO>> GetBorrowedBooksDueTomorrowForEmailAsync()
         {
             try
             {
@@ -258,7 +258,7 @@ namespace LibraryManagementSystem.Services.Implementations
             }
         }
 
-        public async Task<IList<BorrowedBookEmailDTO>> GetAllOverDueBooksForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForEmailAsync()
         {
             try
             {
