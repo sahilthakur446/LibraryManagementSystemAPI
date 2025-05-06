@@ -3,6 +3,7 @@ using LibraryManagementSystem.Enums;
 using LibraryManagementSystem.Exceptions;
 using LibraryManagementSystem.Models;
 using LibraryManagementSystem.Repositories.Interfaces;
+using LibraryManagementSystem.Repositories.ProjectionModels;
 using LibraryManagementSystem.Settings;
 using Microsoft.EntityFrameworkCore;
 
@@ -394,7 +395,7 @@ namespace LibraryManagementSystem.Repositories.EF
                 throw new RepositoryException("Error fetching borrowed books due tomorrow", ex);
             }
         }
-        public async Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationProjection>> GetAllOverDueBooksForNotificationAsync()
         {
             try
             {
@@ -406,15 +407,14 @@ namespace LibraryManagementSystem.Repositories.EF
                     .Include(bb => bb.BookCopy)
                         .ThenInclude(bc => bc.Book)
                         .AsNoTracking()
-                    .Select(bb => new BorrowedBookNotificationDTO
+                    .Select(bb => new BorrowedBookNotificationProjection
                     {
                         BookTitle = bb.BookCopy.Book.Title,
-                        UserName = $"{bb.User.FirstName} {bb.User.LastName}",
+                        UserFirstName = bb.User.FirstName,
+                        UserLastName = bb.User.FirstName,
                         UserEmail = bb.User.Email,
-                        BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
-                        DueDate = bb.DueDate.ToString("yyyy-MM-dd"),
-                        OverdueDays = (today - bb.DueDate).Days.ToString(),
-                        TotalFine = Math.Max((today - bb.DueDate).Days * 5, 0).ToString()
+                        BorrowDate = bb.BorrowDate,
+                        DueDate = bb.DueDate
                     });
 
                 return await overdueBooksQuery.ToListAsync();
@@ -426,7 +426,7 @@ namespace LibraryManagementSystem.Repositories.EF
             }
         }
 
-        public async Task<IList<BorrowedBookNotificationDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationProjection>> GetAllBorrowedBooksDueTomorrowForNotificationAsync()
         {
             try
             {
@@ -439,13 +439,14 @@ namespace LibraryManagementSystem.Repositories.EF
                     .Include(bb => bb.BookCopy)
                         .ThenInclude(bc => bc.Book)
                     .AsNoTracking() // Optimization for read-only data
-                    .Select(bb => new BorrowedBookNotificationDTO
+                    .Select(bb => new BorrowedBookNotificationProjection
                     {
                         BookTitle = bb.BookCopy.Book.Title,
-                        UserName = $"{bb.User.FirstName} {bb.User.LastName}",
+                        UserFirstName = bb.User.FirstName,
+                        UserLastName = bb.User.FirstName,
                         UserEmail = bb.User.Email,
-                        BorrowDate = bb.BorrowDate.ToString("yyyy-MM-dd"),
-                        DueDate = bb.DueDate.ToString("yyyy-MM-dd"),
+                        BorrowDate = bb.BorrowDate,
+                        DueDate = bb.DueDate
                     });
 
                 return await dueTomorrowQuery.ToListAsync();

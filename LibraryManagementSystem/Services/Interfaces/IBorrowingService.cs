@@ -13,8 +13,8 @@ namespace LibraryManagementSystem.Services.Interfaces
         Task<IList<BorrowingResponseDTO>> GetAllBorrowedBooksAsync();
         Task<IList<BorrowingResponseDTO>> GetAllOverDueBooksAsync();
         Task<IList<BorrowingResponseDTO>> GetBorrowingsDueTomorrowAsync();
-        Task<IList<BorrowedBookNotificationDTO>> GetBorrowedBooksDueTomorrowForEmailAsync();
-        Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForEmailAsync();
+        Task<IList<BorrowedBookNotificationDTO>> GetBorrowedBooksDueTomorrowForNotificationAsync();
+        Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForNotificationAsync();
         Task<bool> UpdateOverdueBooksStatusAsync();
         Task<bool> IsSameBookAlreadyBorrowedByUser(int bookId, int userId);
     }

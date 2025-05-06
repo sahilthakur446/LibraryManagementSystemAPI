@@ -1,5 +1,6 @@
 ﻿using LibraryManagementSystem.DTOs.Borrowing;
 using LibraryManagementSystem.Models;
+using LibraryManagementSystem.Repositories.ProjectionModels;
 
 namespace LibraryManagementSystem.Repositories.Interfaces
 {
@@ -14,8 +15,8 @@ namespace LibraryManagementSystem.Repositories.Interfaces
         Task<IList<BorrowedBook>> GetAllBorrowedBooksAsync();
         Task<IList<BorrowedBook>> GetAllOverDueBooksAsync();
         Task<IList<BorrowedBook>> GetAllBorrowedBooksDueTomorrowAsync();
-        Task<IList<BorrowedBookNotificationDTO>> GetAllBorrowedBooksDueTomorrowForEmailAsync();
-        Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForEmailAsync();
+        Task<IList<BorrowedBookNotificationProjection>> GetAllBorrowedBooksDueTomorrowForNotificationAsync();
+        Task<IList<BorrowedBookNotificationProjection>> GetAllOverDueBooksForNotificationAsync();
         Task<bool> UpdateOverdueBooksStatusAsync();
     }
 }

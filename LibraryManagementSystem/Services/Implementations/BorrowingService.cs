@@ -1,10 +1,14 @@
 ﻿using LibraryManagementSystem.DTOs.Borrowing;
+using LibraryManagementSystem.DTOs.Notification;
+using LibraryManagementSystem.Enums;
 using LibraryManagementSystem.Exceptions;
 using LibraryManagementSystem.Mappers;
 using LibraryManagementSystem.Models;
 using LibraryManagementSystem.Repositories.EF;
 using LibraryManagementSystem.Repositories.Interfaces;
 using LibraryManagementSystem.Services.Interfaces;
+using LibraryManagementSystem.Settings;
+using Microsoft.VisualBasic;
 using System.Collections.Generic;
 
 namespace LibraryManagementSystem.Services.Implementations
@@ -12,13 +16,15 @@ namespace LibraryManagementSystem.Services.Implementations
     public class BorrowingService : IBorrowingService
     {
         private readonly IBorrowingRepository borrowingRepository;
-        private readonly IEmailService emailService;
+        private readonly IFineCalculator fineCalculator;
+        private readonly INotificationService notificationService;
         private readonly ILogger<BorrowingService> logger;
 
-        public BorrowingService(IBorrowingRepository borrowingRepository, IEmailService emailService, ILogger<BorrowingService> logger)
+        public BorrowingService(IBorrowingRepository borrowingRepository, INotificationService notificationService, ILogger<BorrowingService> logger, IFineCalculator fineCalculator)
         {
             this.borrowingRepository = borrowingRepository;
-            this.emailService = emailService;
+            this.notificationService = notificationService;
+            this.fineCalculator = fineCalculator;
             this.logger = logger;
         }
 
@@ -29,33 +35,54 @@ namespace LibraryManagementSystem.Services.Implementations
                 var borrowedBooks = await borrowingRepository.GetBorrowedBooksByUserIdAsync(userId);
                 if (borrowedBooks.Count >= 3)
                 {
-                    throw new BusinessExceptions("Borrowing limit reached. You cannot borrow more than 3 books.", StatusCodes.Status200OK);
+                    throw new BusinessExceptions(
+                        "Borrowing limit reached. You cannot borrow more than 3 books.",
+                        StatusCodes.Status200OK);
                 }
-                var isSameBookAlreadyBorrowedByUser = await IsSameBookAlreadyBorrowedByUser(bookId, userId);
-                if (isSameBookAlreadyBorrowedByUser)
+
+                var isSameBookBorrowed = await IsSameBookAlreadyBorrowedByUser(bookId, userId);
+                if (isSameBookBorrowed)
                 {
-                    throw new BusinessExceptions("This book is already borrowed by the user.", StatusCodes.Status400BadRequest);
+                    throw new BusinessExceptions(
+                        "This book is already borrowed by the user.",
+                        StatusCodes.Status400BadRequest);
                 }
+
                 var availableCopies = await borrowingRepository.GetAvailableBookCopiesAsync(bookId);
                 if (availableCopies == 0)
                 {
-                    throw new BusinessExceptions("No available copies of this book right now.", StatusCodes.Status400BadRequest);
+                    throw new BusinessExceptions(
+                        "No available copies of this book right now.",
+                        StatusCodes.Status400BadRequest);
                 }
 
                 var outstandingFine = await borrowingRepository.GetRemainingFineByUserIdAsync(userId);
                 if (outstandingFine > 100)
                 {
-                    throw new BusinessExceptions("Outstanding fine exceeds limit. Please repay your dues before borrowing more books.", StatusCodes.Status400BadRequest);
+                    throw new BusinessExceptions(
+                        "Outstanding fine exceeds the limit. Please clear your dues before borrowing more books.",
+                        StatusCodes.Status400BadRequest);
                 }
+
                 var borrowedBook = await borrowingRepository.BorrowBookAsync(bookId, userId, bookCopyId);
-                string userName = $"{borrowedBook.User.FirstName} {borrowedBook.User.LastName}";
-                DateTime returnDate = borrowedBook.BorrowDate.AddDays(14);
-                await emailService.SendBookIssuedEmailAsync(
-                    borrowedBook.User.Email,
-                    userName,
-                    borrowedBook.BorrowDate,
-                    returnDate
-                );
+
+                var notification = new BorrowedBookNotificationDTO
+                {
+                    UserName = $"{borrowedBook.User.FirstName} {borrowedBook.User.LastName}",
+                    UserEmail = borrowedBook.User.Email,
+                    BorrowDate = borrowedBook.BorrowDate.ToString("yyyy-MMM-dd"),
+                    DueDate = borrowedBook.BorrowDate.AddDays(LibrarySettings.MaxBorrowDays).ToString("yyyy-MMM-dd")
+                };
+
+                var notificationMessage = new NotificationMessage
+                {
+                    NotificationType = NotificationType.BookIssued,
+                    borrowedBookDetails = notification,
+                    CreatedAt = DateTime.Now
+                };
+
+                await notificationService.SendAsync(notificationMessage);
+
                 return BorrowingMapper.FromModel(borrowedBook);
             }
             catch (RepositoryException ex) when (ex.Message == "Book not found")
@@ -75,20 +102,34 @@ namespace LibraryManagementSystem.Services.Implementations
             try
             {
                 var returnedBook = await borrowingRepository.ReturnBookAsync(copyBookId, userId);
-                string userName = $"{returnedBook.User.FirstName} {returnedBook.User.LastName}";
-                await emailService.SendBookReturnedEmailAsync(
-                    returnedBook.User.Email,
-                    userName,
-                    returnedBook.BorrowDate, returnedBook.DueDate, DateTime.UtcNow.Date
-                );
+
+                var notification = new BorrowedBookNotificationDTO
+                {
+                    UserName = $"{returnedBook.User.FirstName} {returnedBook.User.LastName}",
+                    UserEmail = returnedBook.User.Email,
+                    BorrowDate = returnedBook.BorrowDate.ToString("yyyy-MMM-dd"),
+                    DueDate = returnedBook.DueDate.ToString("yyyy-MMM-dd"),
+                    ReturnDate = DateTime.UtcNow.Date.ToString("yyyy-MMM-dd")
+                };
+
+                var notificationMessage = new NotificationMessage
+                {
+                    NotificationType = NotificationType.BookReturned,
+                    borrowedBookDetails = notification,
+                    CreatedAt = DateTime.Now
+                };
+
+                await notificationService.SendAsync(notificationMessage);
+
                 return BorrowingMapper.FromModel(returnedBook);
             }
             catch (RepositoryException ex)
             {
-                logger.LogError(ex, "Error while returning book for UserId: {UserId},CopyBookId;{CopyBookId}", userId, copyBookId);
+                logger.LogError(ex, "Error while returning book for UserId: {UserId}, CopyBookId: {CopyBookId}", userId, copyBookId);
                 throw new BusinessExceptions("An error occurred while processing your return request. Please try again later.", StatusCodes.Status500InternalServerError);
             }
         }
+
 
         public async Task<BorrowingResponseDTO> ReturnBookAsync(int borrowingId)
         {
@@ -106,13 +147,23 @@ namespace LibraryManagementSystem.Services.Implementations
                 var bookCopyId = returnedBook.BookCopy?.CopyId ?? 0;
                 string userName = $"{returnedBook.User.FirstName} {returnedBook.User.LastName}";
 
-                await emailService.SendBookReturnedEmailAsync(
-                    returnedBook.User.Email,
-                    userName,
-                    returnedBook.BorrowDate,
-                    returnedBook.DueDate,
-                    DateTime.UtcNow.Date
-                );
+                var notification = new BorrowedBookNotificationDTO
+                {
+                    UserName = userName,
+                    UserEmail = returnedBook.User.Email,
+                    BorrowDate = returnedBook.BorrowDate.ToString("yyyy-MMM-dd"),
+                    DueDate = returnedBook.DueDate.ToString("yyyy-MMM-dd"),
+                    ReturnDate = DateTime.UtcNow.Date.ToString("yyyy-MMM-dd")
+                };
+
+                var notificationMessage = new NotificationMessage
+                {
+                    NotificationType = NotificationType.BookReturned,
+                    borrowedBookDetails = notification,
+                    CreatedAt = DateTime.Now
+                };
+
+                await notificationService.SendAsync(notificationMessage);
 
                 logger.LogInformation("ReturnBookAsync: Book Copy ID {BookId} successfully returned by User ID {UserId}", bookCopyId, userId);
 
@@ -126,7 +177,6 @@ namespace LibraryManagementSystem.Services.Implementations
                     StatusCodes.Status400BadRequest
                 );
             }
-
             catch (RepositoryException ex)
             {
                 logger.LogError(ex, "Error while returning book for BorrowingId: {BorrowingId}", borrowingId);
@@ -243,13 +293,16 @@ namespace LibraryManagementSystem.Services.Implementations
             }
         }
 
-        public async Task<IList<BorrowedBookNotificationDTO>> GetBorrowedBooksDueTomorrowForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationDTO>> GetBorrowedBooksDueTomorrowForNotificationAsync()
         {
             try
             {
-                var borrowingsDueTomorrow = await borrowingRepository.GetAllBorrowedBooksDueTomorrowForEmailAsync();
+                var borrowingsDueTomorrow = await borrowingRepository.GetAllBorrowedBooksDueTomorrowForNotificationAsync();
+                var borrowings = borrowingsDueTomorrow
+                    .Select(BorrowingNotificationMapper.FromProjectionToDTO)
+                    .ToList();
 
-                return borrowingsDueTomorrow;
+                return borrowings;
             }
             catch (RepositoryException ex)
             {
@@ -258,21 +311,32 @@ namespace LibraryManagementSystem.Services.Implementations
             }
         }
 
-        public async Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForEmailAsync()
+        public async Task<IList<BorrowedBookNotificationDTO>> GetAllOverDueBooksForNotificationAsync()
         {
             try
             {
-                var overdueBorrowings = await borrowingRepository.GetAllOverDueBooksForEmailAsync();
+                var today = DateTime.Today;
+                var finePerDay = LibrarySettings.FinePerDay;
 
-                return overdueBorrowings;
+                var overdueBorrowings = await borrowingRepository.GetAllOverDueBooksForNotificationAsync();
+
+                var borrowings = overdueBorrowings
+                    .Select(bb =>
+                    {
+                        var overdueDays = (today - bb.DueDate).Days;
+                        var totalFine = fineCalculator.CalculateFine(bb.DueDate);
+                        return BorrowingNotificationMapper.FromProjectionToDTO(bb, overdueDays, totalFine);
+                    })
+                    .ToList();
+
+                return borrowings;
             }
             catch (RepositoryException ex)
             {
-                logger.LogError(ex, "Error while retrieving borrowings due tomorrow for email.");
+                logger.LogError(ex, "Error while retrieving overdue borrowings for email.");
                 throw new BusinessExceptions("An error occurred while fetching borrowings.", StatusCodes.Status500InternalServerError);
             }
         }
-
         public async Task<bool> UpdateOverdueBooksStatusAsync()
         {
             try

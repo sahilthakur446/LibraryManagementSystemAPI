@@ -1,4 +1,6 @@
 ﻿using LibraryManagementSystem.DTOs.Borrowing;
+using LibraryManagementSystem.DTOs.Notification;
+using LibraryManagementSystem.Enums;
 using LibraryManagementSystem.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -48,16 +50,18 @@ namespace LibraryManagementSystem.BackgroundServices
         {
             using var scope = _serviceProvider.CreateScope();
 
-            var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+            var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
             var borrowingService = scope.ServiceProvider.GetRequiredService<IBorrowingService>();
 
-            var dueTomorrowBooks = await borrowingService.GetBorrowedBooksDueTomorrowForEmailAsync();
-
+            var dueTomorrowBooks = await borrowingService.GetBorrowedBooksDueTomorrowForNotificationAsync();
+            var dueTomorrowNotification = new NotificationMessage();
+            dueTomorrowNotification.NotificationType = NotificationType.ReturnDueTomorrow;
             bool statusUpdateResult = await borrowingService.UpdateOverdueBooksStatusAsync();
             _logger.LogInformation("Overdue book status update result: {Status}", statusUpdateResult);
 
-            var overdueBooks = await borrowingService.GetAllOverDueBooksForEmailAsync();
-
+            var overdueBooks = await borrowingService.GetAllOverDueBooksForNotificationAsync();
+            var overDueNotification = new NotificationMessage();
+            overDueNotification.NotificationType = NotificationType.OverdueFineReminder;
             foreach (var book in dueTomorrowBooks)
             {
                 if (stoppingToken.IsCancellationRequested)
@@ -65,7 +69,9 @@ namespace LibraryManagementSystem.BackgroundServices
 
                 try
                 {
-                    await emailService.SendReturnDueTomorrowEmailAsync(book);
+                    dueTomorrowNotification.borrowedBookDetails = book;
+                    dueTomorrowNotification.CreatedAt = DateTime.Now;
+                    await notificationService.SendAsync(dueTomorrowNotification);
                     _logger.LogInformation("Sent 'due tomorrow' notification to {UserEmail} for book borrowed on {BorrowDate}",
                         book.UserEmail, book.BorrowDate);
                 }
@@ -82,7 +88,9 @@ namespace LibraryManagementSystem.BackgroundServices
 
                 try
                 {
-                    await emailService.SendOverdueFineReminderEmailAsync(book);
+                    overDueNotification.borrowedBookDetails = book;
+                    overDueNotification.CreatedAt = DateTime.Now;
+                    await notificationService.SendAsync(overDueNotification);
                     _logger.LogInformation("Sent 'overdue' fine reminder to {UserEmail} for book borrowed on {BorrowDate}",
                         book.UserEmail, book.BorrowDate);
                 }

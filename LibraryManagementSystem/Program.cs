@@ -37,6 +37,7 @@ builder.Services.AddDbContext<LibraryDbContext>(options =>
 
 builder.Services.AddControllers();
 builder.Services.AddHostedService<EmailBackgroundService>();
+builder.Services.AddScoped<INotificationService, EmailService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IUserService, UserService>();
@@ -50,11 +51,12 @@ builder.Services.AddScoped<IBookRepository, BookRepositoryEF>();
 builder.Services.AddScoped<IBookService, BookService>();
 builder.Services.AddScoped<IBorrowingRepository, BorrowingRepository>();
 builder.Services.AddScoped<IBorrowingService, BorrowingService>();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IFineCalculator, FineCalculator>();
 
 builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings")
 );
+
 
 
 builder.Services.AddEndpointsApiExplorer();
