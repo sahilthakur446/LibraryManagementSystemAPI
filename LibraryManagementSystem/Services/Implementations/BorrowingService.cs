@@ -68,6 +68,7 @@ namespace LibraryManagementSystem.Services.Implementations
 
                 var notification = new BorrowedBookNotificationDTO
                 {
+                    BookTitle = borrowedBook.BookCopy.Book.Title,
                     UserName = $"{borrowedBook.User.FirstName} {borrowedBook.User.LastName}",
                     UserEmail = borrowedBook.User.Email,
                     BorrowDate = borrowedBook.BorrowDate.ToString("yyyy-MMM-dd"),
@@ -135,25 +136,38 @@ namespace LibraryManagementSystem.Services.Implementations
         {
             try
             {
+                // Attempt to return the book and retrieve its record
                 var returnedBook = await borrowingRepository.ReturnBookAsync(borrowingId);
 
                 if (returnedBook == null)
                 {
-                    logger.LogWarning("ReturnBookAsync: Returned book or user info is missing for BorrowingId {BorrowingId}", borrowingId);
-                    throw new BusinessExceptions("Borrowing Record Not Found.", StatusCodes.Status404NotFound);
+                    logger.LogWarning("ReturnBookAsync: No record found for BorrowingId {BorrowingId}", borrowingId);
+                    throw new BusinessExceptions("Borrowing record not found.", StatusCodes.Status404NotFound);
                 }
 
-                var userId = returnedBook.User.UserId;
-                var bookCopyId = returnedBook.BookCopy?.CopyId ?? 0;
-                string userName = $"{returnedBook.User.FirstName} {returnedBook.User.LastName}";
+                // Prepare common data
+                DateTime today = DateTime.Today;
+                int overdueDays = Math.Max((today - returnedBook.DueDate).Days, 0);
+                int userId = returnedBook.User?.UserId ?? 0;
+                int bookCopyId = returnedBook.BookCopy?.CopyId ?? 0;
+                string userName = $"{returnedBook.User?.FirstName} {returnedBook.User?.LastName}";
+                string bookTitle = returnedBook.BookCopy?.Book?.Title ?? "Unknown Title";
+                string userEmail = returnedBook.User?.Email ?? "Unknown Email";
 
+                // Prepare fine
+                string totalFine = fineCalculator.CalculateFine(returnedBook.DueDate).ToString();
+
+                // Create and send notification
                 var notification = new BorrowedBookNotificationDTO
                 {
+                    BookTitle = bookTitle,
                     UserName = userName,
-                    UserEmail = returnedBook.User.Email,
+                    UserEmail = userEmail,
                     BorrowDate = returnedBook.BorrowDate.ToString("yyyy-MMM-dd"),
                     DueDate = returnedBook.DueDate.ToString("yyyy-MMM-dd"),
-                    ReturnDate = DateTime.UtcNow.Date.ToString("yyyy-MMM-dd")
+                    ReturnDate = today.ToString("yyyy-MMM-dd"),
+                    OverdueDays = overdueDays.ToString(),
+                    TotalFine = totalFine
                 };
 
                 var notificationMessage = new NotificationMessage
@@ -165,23 +179,20 @@ namespace LibraryManagementSystem.Services.Implementations
 
                 await notificationService.SendAsync(notificationMessage);
 
-                logger.LogInformation("ReturnBookAsync: Book Copy ID {BookId} successfully returned by User ID {UserId}", bookCopyId, userId);
+                logger.LogInformation("ReturnBookAsync: Book Copy ID {BookCopyId} returned by User ID {UserId}", bookCopyId, userId);
 
                 return BorrowingMapper.FromModel(returnedBook);
             }
             catch (RepositoryException ex) when (ex.Message == "This book has already been returned.")
             {
-                logger.LogWarning(ex, "Book already returned for BorrowingId: {BorrowingId}", borrowingId);
-                throw new BusinessExceptions(
-                    ex.Message,
-                    StatusCodes.Status400BadRequest
-                );
+                logger.LogWarning(ex, "ReturnBookAsync: Book already returned for BorrowingId {BorrowingId}", borrowingId);
+                throw new BusinessExceptions(ex.Message, StatusCodes.Status400BadRequest);
             }
             catch (RepositoryException ex)
             {
-                logger.LogError(ex, "Error while returning book for BorrowingId: {BorrowingId}", borrowingId);
+                logger.LogError(ex, "ReturnBookAsync: Error occurred for BorrowingId {BorrowingId}", borrowingId);
                 throw new BusinessExceptions(
-                    "An error occurred while processing your return request. Please try again later.",
+                    "An error occurred while processing the return. Please try again later.",
                     StatusCodes.Status500InternalServerError
                 );
             }

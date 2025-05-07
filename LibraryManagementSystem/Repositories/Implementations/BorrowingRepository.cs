@@ -411,7 +411,7 @@ namespace LibraryManagementSystem.Repositories.EF
                     {
                         BookTitle = bb.BookCopy.Book.Title,
                         UserFirstName = bb.User.FirstName,
-                        UserLastName = bb.User.FirstName,
+                        UserLastName = bb.User.LastName,
                         UserEmail = bb.User.Email,
                         BorrowDate = bb.BorrowDate,
                         DueDate = bb.DueDate
@@ -443,7 +443,7 @@ namespace LibraryManagementSystem.Repositories.EF
                     {
                         BookTitle = bb.BookCopy.Book.Title,
                         UserFirstName = bb.User.FirstName,
-                        UserLastName = bb.User.FirstName,
+                        UserLastName = bb.User.LastName,
                         UserEmail = bb.User.Email,
                         BorrowDate = bb.BorrowDate,
                         DueDate = bb.DueDate

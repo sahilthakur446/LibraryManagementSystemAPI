@@ -64,8 +64,9 @@ public class EmailService : INotificationService
             emailBody = emailBody
                 .Replace("{{BookTitle}}", book.BookTitle)
                 .Replace("{{UserName}}", book.UserName)
-                .Replace("{{IssueDate}}", book.BorrowDate)
+                .Replace("{{BorrowDate}}", book.BorrowDate)
                 .Replace("{{DueDate}}", book.DueDate)
+                .Replace("{{ReturnDate}}", book.ReturnDate)
                 .Replace("{{OverdueDays}}", book.OverdueDays.ToString())
                 .Replace("{{FinePerDay}}", book.FinePerDay.ToString())
                 .Replace("{{TotalFine}}", book.TotalFine.ToString());

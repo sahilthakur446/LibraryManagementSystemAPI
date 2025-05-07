@@ -10,13 +10,15 @@
     <p>Hello <strong>{{UserName}}</strong>,</p>
 
     <p>We have successfully received the book you had borrowed. Below are the details of your transaction:</p>
-
+    <p><strong>Book Details:</strong></p>
     <ul>
-        <li><strong>Issue Date:</strong> {{IssueDate}}</li>
+        <li><strong>Title:</strong> {{BookTitle}}</li>
+        <li><strong>Borrowed On:</strong> {{BorrowDate}}</li>
         <li><strong>Due Date:</strong> {{DueDate}}</li>
         <li><strong>Return Date:</strong> {{ReturnDate}}</li>
+        <li><strong>Days Overdue:</strong> {{OverdueDays}}</li>
         <li><strong>Per Day Fine (if overdue):</strong> ₹{{FinePerDay}}</li>
-        <li><strong>Total Fine Applied:</strong> ₹{{FineAmount}}</li>
+        <li><strong>Total Fine:</strong> ₹{{TotalFine}}</li>
     </ul>
 
     <p>

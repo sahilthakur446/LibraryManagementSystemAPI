@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,82 +27,101 @@ namespace LibraryManagementSystem.BackgroundServices
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Email background service is starting.");
+            _logger.LogInformation("Email background service started.");
 
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
                 {
-                    _logger.LogInformation("Checking for due and overdue emails to send...");
-                    await ProcessDueEmails(stoppingToken);
+                    _logger.LogInformation("Processing overdue status updates and notifications...");
+
+                    await UpdateBookOverdueStatusIfNeededAsync(stoppingToken);
+                    await ProcessAndSendNotificationsAsync(stoppingToken);
+
+                    _logger.LogInformation("Completed daily email notification processing.");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "An error occurred while processing due or overdue emails.");
+                    _logger.LogError(ex, "An error occurred during background email processing.");
                 }
 
                 await Task.Delay(_interval, stoppingToken);
             }
 
-            _logger.LogInformation("Email background service is stopping.");
+            _logger.LogInformation("Email background service stopped.");
         }
 
-        private async Task ProcessDueEmails(CancellationToken stoppingToken)
+        private async Task UpdateBookOverdueStatusIfNeededAsync(CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested) return;
+
+            using var scope = _serviceProvider.CreateScope();
+            var borrowingService = scope.ServiceProvider.GetRequiredService<IBorrowingService>();
+
+            try
+            {
+                bool isUpdated = await borrowingService.UpdateOverdueBooksStatusAsync();
+                _logger.LogInformation("Overdue books status update result: {Result}", isUpdated);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update overdue books status.");
+            }
+        }
+
+        private async Task ProcessAndSendNotificationsAsync(CancellationToken cancellationToken)
         {
             using var scope = _serviceProvider.CreateScope();
 
             var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
             var borrowingService = scope.ServiceProvider.GetRequiredService<IBorrowingService>();
 
-            var dueTomorrowBooks = await borrowingService.GetBorrowedBooksDueTomorrowForNotificationAsync();
-            var dueTomorrowNotification = new NotificationMessage();
-            dueTomorrowNotification.NotificationType = NotificationType.ReturnDueTomorrow;
-            bool statusUpdateResult = await borrowingService.UpdateOverdueBooksStatusAsync();
-            _logger.LogInformation("Overdue book status update result: {Status}", statusUpdateResult);
+            var dueTomorrow = await borrowingService.GetBorrowedBooksDueTomorrowForNotificationAsync();
+            var overdue = await borrowingService.GetAllOverDueBooksForNotificationAsync();
 
-            var overdueBooks = await borrowingService.GetAllOverDueBooksForNotificationAsync();
-            var overDueNotification = new NotificationMessage();
-            overDueNotification.NotificationType = NotificationType.OverdueFineReminder;
-            foreach (var book in dueTomorrowBooks)
+            var dueNotifications = BuildNotificationMessages(dueTomorrow, NotificationType.ReturnDueTomorrow);
+            var overdueNotifications = BuildNotificationMessages(overdue, NotificationType.OverdueFineReminder);
+
+            await SendNotificationsAsync(notificationService, dueNotifications, cancellationToken);
+            await SendNotificationsAsync(notificationService, overdueNotifications, cancellationToken);
+
+            _logger.LogInformation("Sent {DueCount} due and {OverdueCount} overdue notifications.",
+                dueTomorrow.Count, overdue.Count);
+        }
+
+        private List<NotificationMessage> BuildNotificationMessages(IList<BorrowedBookNotificationDTO> books, NotificationType type)
+        {
+            return books.Select(book => new NotificationMessage
             {
-                if (stoppingToken.IsCancellationRequested)
+                NotificationType = type,
+                borrowedBookDetails = book,
+                CreatedAt = DateTime.UtcNow,
+                IsRead = false
+            }).ToList();
+        }
+
+        private async Task SendNotificationsAsync(INotificationService notificationService, IEnumerable<NotificationMessage> notifications, CancellationToken cancellationToken)
+        {
+            foreach (var notification in notifications)
+            {
+                if (cancellationToken.IsCancellationRequested)
                     break;
 
                 try
                 {
-                    dueTomorrowNotification.borrowedBookDetails = book;
-                    dueTomorrowNotification.CreatedAt = DateTime.Now;
-                    await notificationService.SendAsync(dueTomorrowNotification);
-                    _logger.LogInformation("Sent 'due tomorrow' notification to {UserEmail} for book borrowed on {BorrowDate}",
-                        book.UserEmail, book.BorrowDate);
+                    await notificationService.SendAsync(notification);
+                    _logger.LogInformation("Sent '{Type}' notification to {Email} (Borrowed on {Date})",
+                        notification.NotificationType,
+                        notification.borrowedBookDetails.UserEmail,
+                        notification.borrowedBookDetails.BorrowDate);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to send 'due tomorrow' email to {UserEmail}", book.UserEmail);
+                    _logger.LogError(ex, "Failed to send '{Type}' notification to {Email}",
+                        notification.NotificationType,
+                        notification.borrowedBookDetails.UserEmail);
                 }
             }
-
-            foreach (var book in overdueBooks)
-            {
-                if (stoppingToken.IsCancellationRequested)
-                    break;
-
-                try
-                {
-                    overDueNotification.borrowedBookDetails = book;
-                    overDueNotification.CreatedAt = DateTime.Now;
-                    await notificationService.SendAsync(overDueNotification);
-                    _logger.LogInformation("Sent 'overdue' fine reminder to {UserEmail} for book borrowed on {BorrowDate}",
-                        book.UserEmail, book.BorrowDate);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to send 'overdue' fine reminder to {UserEmail}", book.UserEmail);
-                }
-            }
-
-            _logger.LogInformation("Processed {DueCount} due tomorrow notifications and {OverdueCount} overdue notifications",
-                dueTomorrowBooks.Count(), overdueBooks.Count());
         }
     }
 }
